@@ -3,10 +3,13 @@
 
 #include "luos.h"
 
-#define MAX_ID 40
+#define MAX_ID 30
 #define DXL_TIMEOUT 1
 #define TEMP_REFRESH_MS 1000
 #define FACTORY_RESET_REG 0xFF
+
+#define DXL_NUMBER 8
+#define GET_POS_PERIOD 1 // for a single motor (thus the period for all motors will be * DXL_NUMBER)
 
 void dxl_init(void);
 void dxl_loop(void);
