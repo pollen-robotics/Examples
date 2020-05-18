@@ -487,6 +487,15 @@ void msg_to_json(msg_t* msg, char *json) {
             sprintf(json, "\"%s\":[%2f,%2f,%2f],", name, value[0], value[1], value[2]);
         }
     break;
+    case REACHY_ARM_POS:
+        {
+        float value[8];
+        memcpy(value, msg->data, msg->header.size);
+        sprintf(json, "\"%s\":[%2f,%2f,%2f,%2f,%2f,%2f,%2f,%2f],", "rot_position", 
+                value[0], value[1], value[2], value[3], 
+                value[4], value[5], value[6], value[7]);
+        }
+    break;
     case QUATERNION:
         // check size
         if (msg->header.size == (4 * sizeof(float))) {

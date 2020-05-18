@@ -2,6 +2,7 @@
 #define DXL_H
 
 #include "luos.h"
+#include "Dynamixel_Servo.h"
 
 #define MAX_ID 30
 #define DXL_TIMEOUT 1
@@ -10,6 +11,7 @@
 
 #define DXL_NUMBER 8
 #define GET_POS_PERIOD 1 // for a single motor (thus the period for all motors will be * DXL_NUMBER)
+#define MAX_CMD 30
 
 void dxl_init(void);
 void dxl_loop(void);
@@ -42,11 +44,10 @@ typedef enum {
 }dxl_mode_t;
 
 typedef struct {
-        dxl_mode_t mode;
-        int reg;
-        float val;
-        float val2;
-        module_t *module_pointer;
-}dxl_t;
+    uint16_t motor_id;
+    uint16_t val;
+    servo_register_t reg;
+    uint8_t waiting;
+}dxl_command_t;
 
 #endif /* DXL_H */
