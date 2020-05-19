@@ -10,7 +10,8 @@
 #define FACTORY_RESET_REG 0xFF
 
 #define DXL_NUMBER 8
-#define GET_POS_PERIOD 1 // for a single motor (thus the period for all motors will be * DXL_NUMBER)
+#define GET_POS_PERIOD 1 // in ms for a single motor (thus the period for all motors will be * DXL_NUMBER)
+#define GET_TEMP_PERIOD 500 // in ms for a single motor (thus the period for all motors will be * DXL_NUMBER)
 #define MAX_CMD 30
 
 void dxl_init(void);
@@ -40,13 +41,15 @@ typedef enum {
     MODE_DETECT,
     MODE_TEMP,
     MODE_REG,
-    MODE_ID
+    MODE_ID,
+    MODE_REINIT
 }dxl_mode_t;
 
 typedef struct {
-    uint16_t motor_id;
-    uint16_t val;
-    servo_register_t reg;
+    uint8_t module_id;
+
+    dxl_mode_t mode;
+    float val[3];
     uint8_t waiting;
 }dxl_command_t;
 
