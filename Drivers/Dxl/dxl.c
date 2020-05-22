@@ -388,7 +388,6 @@ void handle_cmd(void)
 
                 case MODE_REINIT:
                     {
-                        status_led(1);
                         servo_init(57600);
                         HAL_Delay(500);
                         servo_set_raw_byte(SERVO_BROADCAST_ID, SERVO_REGISTER_BAUD_RATE, 1, DXL_TIMEOUT);
