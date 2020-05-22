@@ -31,6 +31,7 @@
 /* USER CODE BEGIN Includes */
 #include "luos.h"
 #include "dxl.h"
+#include "fan.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,6 +103,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   luos_init();
   dxl_init();
+  fan_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -110,6 +112,7 @@ int main(void)
   {
     luos_loop();
     dxl_loop();
+    fan_loop();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
