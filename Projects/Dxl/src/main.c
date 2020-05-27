@@ -31,6 +31,7 @@
 /* USER CODE BEGIN Includes */
 #include "luos.h"
 #include "dxl.h"
+#include "fan.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
