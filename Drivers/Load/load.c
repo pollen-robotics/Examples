@@ -53,7 +53,7 @@ void rx_load_cb(module_t *module, msg_t *msg)
 void load_init(void)
 {
     hx711_init(128);
-    luos_module_create(rx_load_cb, LOAD_MOD, "load_mod", STRINGIFY(VERSION));
+    luos_module_create(rx_load_cb, LOAD_MOD, "force_gripper", STRINGIFY(VERSION));
 }
 
 void load_loop(void)
