@@ -62,7 +62,13 @@ void gate_init(void)
     LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
     LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
     LL_USART_EnableDMAReq_RX(USART3);
+
+    #ifdef ORBITA
+    module = luos_module_create(0, GATE_MOD, "r_head", STRINGIFY(VERSION));
+    #else
     module = luos_module_create(0, GATE_MOD, "gate", STRINGIFY(VERSION));
+    #endif
+
     status_led(0);
 }
 
