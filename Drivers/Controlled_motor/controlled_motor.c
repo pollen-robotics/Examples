@@ -50,6 +50,9 @@ volatile angular_position_t last_position = 0.0;
 volatile float measurement_buf[BUFFER_SIZE];
 streaming_channel_t measurement;
 
+// Speed calculation values
+char speed_bootstrap = 0;
+
 void HAL_SYSTICK_Motor_Callback(void)
 {
     // ************* motion planning *************
@@ -157,7 +160,9 @@ void rx_ctrl_mot_cb(module_t *module, msg_t *msg)
             }
             else
             {
+                node_disable_irq();
                 angular_position_to_msg((angular_position_t *)&motor.angular_position, &pub_msg);
+                node_enable_irq();
                 luos_send(module, &pub_msg);
             }
         }
@@ -214,10 +219,12 @@ void rx_ctrl_mot_cb(module_t *module, msg_t *msg)
             enable_motor(motor.mode.mode_compliant == 0);
             if (motor.mode.mode_compliant == 0)
             {
+                node_disable_irq();
                 last_position = motor.angular_position;
                 errAngleSum = 0.0;
                 lastErrAngle = 0.0;
                 motor.target_angular_position = motor.angular_position;
+                node_enable_irq();
             }
         }
         return;
@@ -247,11 +254,14 @@ void rx_ctrl_mot_cb(module_t *module, msg_t *msg)
     if (msg->header.cmd == REINIT)
     {
         // set state to 0
+        node_disable_irq();
         motor.angular_position = 0.0;
         motor.target_angular_position = 0.0;
+        node_enable_irq();
         errAngleSum = 0.0;
         lastErrAngle = 0.0;
         last_position = 0.0;
+        speed_bootstrap = 0;
         return;
     }
     if (msg->header.cmd == DIMENSION)
@@ -274,8 +284,10 @@ void rx_ctrl_mot_cb(module_t *module, msg_t *msg)
             if (msg->header.size == sizeof(float))
             {
                 // set the motor target angular position
+                node_disable_irq();
                 last_position = motor.angular_position;
                 angular_position_from_msg((angular_position_t *)&motor.target_angular_position, msg);
+                node_enable_irq();
             }
             else
             {
@@ -459,7 +471,6 @@ void controlled_motor_loop(void)
     uint32_t deltatime = timestamp - last_asserv_systick;
 
     // Speed measurement
-    static char settings = 0;
     static angular_position_t last_angular_positions[SPEED_NB_INTEGRATION];
 
     // ************* Values computation *************
@@ -479,7 +490,8 @@ void controlled_motor_loop(void)
         // add the position value into unfiltered speed measurement
         for (int nbr = 0; nbr < (SPEED_NB_INTEGRATION - 1); nbr++)
         {
-            if (!settings)
+            // Check if this is the first measurement. If it is init the table.
+            if (!speed_bootstrap)
             {
                 last_angular_positions[nbr] = motor.angular_position;
             }
@@ -488,7 +500,7 @@ void controlled_motor_loop(void)
                 last_angular_positions[nbr] = last_angular_positions[nbr + 1];
             }
         }
-        settings = 1;
+        speed_bootstrap = 1;
         last_angular_positions[SPEED_NB_INTEGRATION - 1] = motor.angular_position;
         motor.angular_speed = (last_angular_positions[SPEED_NB_INTEGRATION - 1] - last_angular_positions[0]) * 1000.0 / SPEED_PERIOD;
         // linear_speed => m/seconds
