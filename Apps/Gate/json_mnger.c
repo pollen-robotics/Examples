@@ -22,6 +22,15 @@ void collect_data(module_t *module)
             // This module is a sensor so create a msg and send it
             json_msg.header.target = i;
             luos_send(module, &json_msg);
+
+            #ifdef ORBITA
+            int received_msg_bak = luos_message_available();
+            volatile int tempo = 0;
+            while ((tempo < 5000) && (luos_message_available() == received_msg_bak))
+            {
+                tempo++;
+            }
+            #endif ORBITA
         }
     }
 }
