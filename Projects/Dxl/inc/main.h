@@ -65,16 +65,15 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
-/* USER CODE END EFP */
-
-/* Private defines -----------------------------------------------------------*/
 #define SHOULDER_FAN_Pin GPIO_PIN_5
 #define SHOULDER_FAN_GPIO_Port GPIOB
 #define ELBOW_FAN_Pin GPIO_PIN_3
 #define ELBOW_FAN_GPIO_Port GPIOB
 #define WRIST_FAN_Pin GPIO_PIN_0
 #define WRIST_FAN_GPIO_Port GPIOB
+/* USER CODE END EFP */
+
+/* Private defines -----------------------------------------------------------*/
 #define DEBUG2_Pin GPIO_PIN_1
 #define DEBUG2_GPIO_Port GPIOA
 #define ROBUS_POWER_SENSOR_Pin GPIO_PIN_2
