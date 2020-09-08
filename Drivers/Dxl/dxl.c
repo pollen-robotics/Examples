@@ -249,7 +249,7 @@ void discover_dxl(void)
 
     for (int i = 0; i < MAX_ID; i++)
     {
-        if (!(servo_ping(i, DXL_TIMEOUT) & SERVO_ERROR_TIMEOUT))
+        if (!(servo_ping(i, DXL_SAFE_TIMEOUT)))
         {
             // no timeout occured, there is a servo here
             sprintf(my_string, "dxl_%d", i);
@@ -257,11 +257,14 @@ void discover_dxl(void)
             luos_module_enable_rt(my_module[y]);
             dxl_table[y] = i;
 
-            servo_get_raw_word(i, SERVO_REGISTER_MODEL_NUMBER, (uint16_t *)&dxl_model[y], DXL_TIMEOUT);
+            while (servo_get_raw_word(i, SERVO_REGISTER_MODEL_NUMBER, (uint16_t *)&dxl_model[y], DXL_TIMEOUT))
+            {
+                HAL_Delay(10);
+            }
             // put a delay on motor response
-            servo_set_raw_byte(i, SERVO_REGISTER_RETURN_DELAY_TIME, 10, DXL_TIMEOUT);
+            servo_set_raw_byte(i, SERVO_REGISTER_RETURN_DELAY_TIME, 10, DXL_SAFE_TIMEOUT);
             // set limit temperature to 55°C
-            servo_set_raw_byte(i, SERVO_REGISTER_MAX_TEMPERATURE, 55, DXL_TIMEOUT);
+            servo_set_raw_byte(i, SERVO_REGISTER_MAX_TEMPERATURE, 55, DXL_SAFE_TIMEOUT);
             y++;
         }
     }
