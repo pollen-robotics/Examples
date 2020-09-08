@@ -20,6 +20,7 @@ uint16_t position[MAX_VM_NUMBER] = {0};
 uint16_t temperature[MAX_VM_NUMBER] = {0};
 
 volatile char publish = 0;
+static int motor_detection = 0;
 
 int find_id(module_t *module)
 {
@@ -35,6 +36,11 @@ int find_id(module_t *module)
 
 void rx_dxl_cb(module_t *module, msg_t *msg)
 {
+    if (motor_detection) 
+    {
+        return;
+    }
+
     static unsigned char last = 0;
 
     if (msg->header.cmd == REGISTER)
@@ -228,6 +234,8 @@ void rx_dxl_cb(module_t *module, msg_t *msg)
 
 void discover_dxl(void)
 {
+    motor_detection = 1;
+
     status_led(1);
     int y = 0;
     char my_string[15];
@@ -264,6 +272,7 @@ void discover_dxl(void)
         luos_module_enable_rt(my_module[y]);
     }
     status_led(0);
+    motor_detection = 0;
 }
 
 void dxl_init(void)
