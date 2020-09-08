@@ -447,13 +447,16 @@ void dxl_request_manager(void)
             }
             if (dxl[last].mode == MODE_PID)
             {
-                if (dxl_model[i] >= MX12)
+                if (dxl_model[i] == MX12 || dxl_model[i] == MX28 || dxl_model[i] == MX64 || dxl_model[i] == MX106)
                 {
                     unsigned char pid[3];
                     memcpy(pid, (void *)&dxl[last].val, 3 * sizeof(char));
                     servo_set_raw_byte(dxl_table[i], SERVO_REGISTER_P_GAIN, pid[0], DXL_TIMEOUT);
+                    HAL_Delay(5);
                     servo_set_raw_byte(dxl_table[i], SERVO_REGISTER_I_GAIN, pid[1], DXL_TIMEOUT);
+                    HAL_Delay(5);
                     servo_set_raw_byte(dxl_table[i], SERVO_REGISTER_D_GAIN, pid[2], DXL_TIMEOUT);
+                    HAL_Delay(5);
                 }
             }
             if (dxl[last].mode == MODE_SPEED)
