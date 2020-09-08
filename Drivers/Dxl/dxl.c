@@ -30,7 +30,7 @@ int find_id(module_t *module)
         if ((int)module == (int)my_module[i])
             return i;
     }
-    return i;
+    while (1) {}
 }
 
 void rx_dxl_cb(module_t *module, msg_t *msg)
