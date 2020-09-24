@@ -20,6 +20,7 @@ uint16_t position[MAX_VM_NUMBER] = {0};
 uint16_t temperature[MAX_VM_NUMBER] = {0};
 
 volatile char publish = 0;
+static int motor_detection = 0;
 
 int find_id(module_t *module)
 {
@@ -30,11 +31,16 @@ int find_id(module_t *module)
         if ((int)module == (int)my_module[i])
             return i;
     }
-    return i;
+    while (1) {}
 }
 
 void rx_dxl_cb(module_t *module, msg_t *msg)
 {
+    if (motor_detection) 
+    {
+        return;
+    }
+
     static unsigned char last = 0;
 
     if (msg->header.cmd == REGISTER)
@@ -228,6 +234,8 @@ void rx_dxl_cb(module_t *module, msg_t *msg)
 
 void discover_dxl(void)
 {
+    motor_detection = 1;
+
     status_led(1);
     int y = 0;
     char my_string[15];
@@ -241,7 +249,7 @@ void discover_dxl(void)
 
     for (int i = 0; i < MAX_ID; i++)
     {
-        if (!(servo_ping(i, DXL_TIMEOUT) & SERVO_ERROR_TIMEOUT))
+        if (!(servo_ping(i, DXL_SAFE_TIMEOUT)))
         {
             // no timeout occured, there is a servo here
             sprintf(my_string, "dxl_%d", i);
@@ -249,11 +257,14 @@ void discover_dxl(void)
             luos_module_enable_rt(my_module[y]);
             dxl_table[y] = i;
 
-            servo_get_raw_word(i, SERVO_REGISTER_MODEL_NUMBER, (uint16_t *)&dxl_model[y], DXL_TIMEOUT);
+            while (servo_get_raw_word(i, SERVO_REGISTER_MODEL_NUMBER, (uint16_t *)&dxl_model[y], DXL_TIMEOUT))
+            {
+                HAL_Delay(10);
+            }
             // put a delay on motor response
-            servo_set_raw_byte(i, SERVO_REGISTER_RETURN_DELAY_TIME, 10, DXL_TIMEOUT);
+            servo_set_raw_byte(i, SERVO_REGISTER_RETURN_DELAY_TIME, 10, DXL_SAFE_TIMEOUT);
             // set limit temperature to 55°C
-            servo_set_raw_byte(i, SERVO_REGISTER_MAX_TEMPERATURE, 55, DXL_TIMEOUT);
+            servo_set_raw_byte(i, SERVO_REGISTER_MAX_TEMPERATURE, 55, DXL_SAFE_TIMEOUT);
             y++;
         }
     }
@@ -264,6 +275,7 @@ void discover_dxl(void)
         luos_module_enable_rt(my_module[y]);
     }
     status_led(0);
+    motor_detection = 0;
 }
 
 void dxl_init(void)
@@ -435,13 +447,16 @@ void dxl_request_manager(void)
             }
             if (dxl[last].mode == MODE_PID)
             {
-                if (dxl_model[i] >= MX12)
+                if (dxl_model[i] == MX12 || dxl_model[i] == MX28 || dxl_model[i] == MX64 || dxl_model[i] == MX106)
                 {
                     unsigned char pid[3];
                     memcpy(pid, (void *)&dxl[last].val, 3 * sizeof(char));
                     servo_set_raw_byte(dxl_table[i], SERVO_REGISTER_P_GAIN, pid[0], DXL_TIMEOUT);
+                    HAL_Delay(5);
                     servo_set_raw_byte(dxl_table[i], SERVO_REGISTER_I_GAIN, pid[1], DXL_TIMEOUT);
+                    HAL_Delay(5);
                     servo_set_raw_byte(dxl_table[i], SERVO_REGISTER_D_GAIN, pid[2], DXL_TIMEOUT);
+                    HAL_Delay(5);
                 }
             }
             if (dxl[last].mode == MODE_SPEED)
