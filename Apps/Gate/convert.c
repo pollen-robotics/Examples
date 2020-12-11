@@ -221,7 +221,7 @@ void json_to_msg(container_t *container, uint16_t id, luos_type_t type, cJSON *j
     {
         msg->data[0] = cJSON_GetObjectItem(jobj, "control")->valueint;
         msg->header.cmd = CONTROL;
-        msg->header.size = sizeof(control_mode_t);
+        msg->header.size = sizeof(control_t);
         Luos_SendMsg(container, msg);
     }
     // Color
