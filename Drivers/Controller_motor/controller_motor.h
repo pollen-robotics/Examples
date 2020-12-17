@@ -20,5 +20,6 @@
  ******************************************************************************/
 void ControllerMotor_Init(void);
 void ControllerMotor_Loop(void);
+void HAL_SYSTICK_Motor_Callback(void);
 
 #endif /* CONTROLLER_MOTOR_H */

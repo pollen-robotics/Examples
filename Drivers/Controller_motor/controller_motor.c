@@ -27,9 +27,6 @@
 #define FB_Pin GPIO_PIN_0
 #define FB_GPIO_Port GPIOB
 
-#define MINI 0
-#define MAXI 1
-
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -60,7 +57,7 @@ char speed_bootstrap = 0;
  * Function
  ******************************************************************************/
 static void ControllerMotor_MsgHandler(container_t *container, msg_t *msg);
-static void set_ratio(float ratio);
+static void set_ratio(ratio_t ratio);
 static void enable_motor(char state);
 
 /******************************************************************************
@@ -204,11 +201,11 @@ void ControllerMotor_Loop(void)
     // angular_posistion => degree
     int32_t encoder_count = (int16_t)TIM2->CNT;
     TIM2->CNT = 0;
-    servo_motor->angular_position += (angular_position_t)((double)encoder_count / (double)(servo_motor->motor_reduction * servo_motor->resolution * 4)) * 360.0;
+    servo_motor->angular_position += AngularOD_PositionFrom_deg(((double)encoder_count / (double)(servo_motor->motor_reduction * servo_motor->resolution * 4)) * 360.0);
     // linear_distance => m
-    servo_motor->linear_position = (servo_motor->angular_position / 360.0) * M_PI * servo_motor->wheel_diameter;
+    servo_motor->linear_position = LinearOD_PositionFrom_m((servo_motor->angular_position / 360.0) * M_PI * servo_motor->wheel_diameter);
     // current => A
-    servo_motor->motor.current = ((((float)analog_input.current) * 3.3f) / 4096.0f) / 0.525f;
+    servo_motor->motor.current = ElectricOD_CurrentFrom_A(((((float)analog_input.current) * 3.3f) / 4096.0f) / 0.525f);
 
     if (deltatime >= ASSERV_PERIOD)
     {
@@ -229,9 +226,9 @@ void ControllerMotor_Loop(void)
         }
         speed_bootstrap = 1;
         last_angular_positions[SPEED_NB_INTEGRATION - 1] = servo_motor->angular_position;
-        servo_motor->angular_speed = (last_angular_positions[SPEED_NB_INTEGRATION - 1] - last_angular_positions[0]) * 1000.0 / SPEED_PERIOD;
+        servo_motor->angular_speed = AngularOD_SpeedFrom_deg_s((last_angular_positions[SPEED_NB_INTEGRATION - 1] - last_angular_positions[0]) * 1000.0 / SPEED_PERIOD);
         // linear_speed => m/seconds
-        servo_motor->linear_speed = (servo_motor->angular_speed / 360.0) * M_PI * servo_motor->wheel_diameter;
+        servo_motor->linear_speed = LinearOD_Speedfrom_m_s((servo_motor->angular_speed / 360.0) * M_PI * servo_motor->wheel_diameter);
         // ************* Limit clamping *************
         if (motion_target_position < servo_motor->limit_angular_position[MINI])
         {
@@ -338,6 +335,10 @@ void ControllerMotor_Loop(void)
  ******************************************************************************/
 static void ControllerMotor_MsgHandler(container_t *container, msg_t *msg)
 {
+    if (msg->header.cmd == ASK_PUB_CMD)
+    {
+        return;
+    }
     if (msg->header.cmd == PARAMETERS)
     {
         enable_motor(servo_motor->mode.mode_compliant == 0);
@@ -444,7 +445,7 @@ void HAL_SYSTICK_Motor_Callback(void)
     last_position = motion_target_position;
 }
 
-static void set_ratio(float ratio)
+static void set_ratio(ratio_t ratio)
 {
     // limit power value
     if (ratio < -servo_motor->motor.limit_ratio)
@@ -453,15 +454,15 @@ static void set_ratio(float ratio)
         ratio = servo_motor->motor.limit_ratio;
     // transform power ratio to timer value
     uint16_t pulse;
-    if (ratio > 0.0)
+    if (RatioOD_RatioToPercent(ratio) > 0.0)
     {
-        pulse = (uint16_t)(ratio * 24.0);
+        pulse = (uint16_t)(RatioOD_RatioToPercent(ratio) * 24.0);
         TIM3->CCR1 = pulse;
         TIM3->CCR2 = 0;
     }
     else
     {
-        pulse = (uint16_t)(-ratio * 24.0);
+        pulse = (uint16_t)(-RatioOD_RatioToPercent(ratio) * 24.0);
         TIM3->CCR1 = 0;
         TIM3->CCR2 = pulse;
     }
