@@ -341,58 +341,31 @@ void json_to_msg(container_t *container, uint16_t id, luos_type_t type, cJSON *j
         msg->header.size = size * sizeof(uint32_t);
         Luos_SendMsg(container, msg);
     }
-    switch (type)
+    if (cJSON_IsArray(cJSON_GetObjectItem(jobj, "register"))) // Watch out this one is only used by Dxl and specific to it.
     {
-    case VOID_MOD:
-    case DYNAMIXEL_MOD:
-        if (cJSON_IsArray(cJSON_GetObjectItem(jobj, "register")))
+        item = cJSON_GetObjectItem(jobj, "parameters");
+        int size = cJSON_GetArraySize(item);
+        // find the first \r of the current buf
+        for (int i = 0; i < size; i++)
         {
-            item = cJSON_GetObjectItem(jobj, "register");
-            int val = (int)cJSON_GetArrayItem(item, 0)->valueint;
-            memcpy(&msg->data[0], &val, sizeof(uint16_t));
-            val = (int)cJSON_GetArrayItem(item, 1)->valueint;
-            if (val <= 0xFF)
-            {
-                memcpy(&msg->data[2], &val, sizeof(uint8_t));
-                msg->header.size = sizeof(uint16_t) + sizeof(uint8_t);
-            }
-            else if (val <= 0xFFFF)
-            {
-                memcpy(&msg->data[2], &val, sizeof(uint16_t));
-                msg->header.size = sizeof(uint16_t) + sizeof(uint16_t);
-            }
-            else
-            {
-                memcpy(&msg->data[2], &val, sizeof(uint32_t));
-                msg->header.size = sizeof(uint16_t) + sizeof(uint32_t);
-            }
-            msg->header.cmd = REGISTER;
-            Luos_SendMsg(container, msg);
+            uint32_t val = (uint32_t)cJSON_GetArrayItem(item, 0)->valuedouble;
+            memcpy(&msg->data[i * sizeof(uint32_t)], &val, sizeof(uint32_t));
         }
-        if (cJSON_IsNumber(cJSON_GetObjectItem(jobj, "set_id")))
-        {
-            msg->data[0] = (char)(cJSON_GetObjectItem(jobj, "set_id")->valueint);
-            msg->header.cmd = SETID;
-            msg->header.size = sizeof(char);
-            Luos_SendMsg(container, msg);
-        }
-        if (cJSON_IsBool(cJSON_GetObjectItem(jobj, "wheel_mode")))
-        {
-            msg->data[0] = cJSON_IsTrue(cJSON_GetObjectItem(jobj, "wheel_mode"));
-            msg->header.cmd = DXL_WHEELMODE;
-            msg->header.size = sizeof(char);
-            Luos_SendMsg(container, msg);
-        }
-        break;
-        break;
-    case GATE_MOD:
-        if (cJSON_IsNumber(cJSON_GetObjectItem(jobj, "delay")))
-        {
-            set_delay(cJSON_GetObjectItem(jobj, "delay")->valueint);
-        }
-        break;
-    default:
-        break;
+        msg->header.cmd = REGISTER;
+        msg->header.size = size * sizeof(uint32_t);
+        Luos_SendMsg(container, msg);
+    }
+    if (cJSON_IsNumber(cJSON_GetObjectItem(jobj, "set_id")))
+    {
+        msg->data[0] = (char)(cJSON_GetObjectItem(jobj, "set_id")->valueint);
+        msg->header.cmd = SETID;
+        msg->header.size = sizeof(char);
+        Luos_SendMsg(container, msg);
+    }
+    if (cJSON_IsNumber(cJSON_GetObjectItem(jobj, "delay")))
+    {
+        // This one is for Gate
+        set_delay(cJSON_GetObjectItem(jobj, "delay")->valueint);
     }
 }
 
