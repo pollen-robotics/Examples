@@ -1,44 +1,23 @@
-/******************************************************************************
- * @file dxl
- * @brief driver example a simple dxl
- * @author Luos
- * @version 0.0.0
- ******************************************************************************/
 #ifndef DXL_H
 #define DXL_H
 
+#include "stdint.h"
 #include "luos.h"
+#include "main.h"
+#include "reachy.h"
 
-/*******************************************************************************
- * Definitions
- ******************************************************************************/
-#define MAX_ID 40
-#define DXL_TIMEOUT 2
-#define TEMP_REFRESH_MS 1000
-#define FACTORY_RESET_REG 0xFF
-/*******************************************************************************
- * Variables
- ******************************************************************************/
+#define NB_DXL 8
+extern uint8_t DXL_IDS[NB_DXL];
 
-// typedef enum
-// {
-//     MODE_WHEEL,
-//     MODE_ANGLE,
-//     MODE_ANGLE_LIMIT,
-//     MODE_POWER_LIMIT,
-//     MODE_PID,
-//     MODE_SPEED,
-//     MODE_COMPLIANT,
-//     MODE_DETECT,
-//     MODE_TEMP,
-//     MODE_REG,
-//     MODE_ID
-// } dxl_mode_t;
-
-/*******************************************************************************
- * Function
- ******************************************************************************/
 void Dxl_Init(void);
 void Dxl_Loop(void);
+void Dxl_MsgHandler(container_t *src, msg_t *msg);
+
+uint8_t is_alive();
+
+uint8_t get_dxl_id(uint8_t id);
+uint8_t dxl_id_exists(uint8_t id);
+
+void status_led(uint8_t state);
 
 #endif /* DXL_H */

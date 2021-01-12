@@ -1,0 +1,30 @@
+#ifndef REACHY_H
+#define REACHY_H
+
+typedef enum
+{
+    // DXL
+    // From PC -> Dxl
+    MSG_TYPE_DXL_GET_REG = 10, // [MSG_TYPE_DXL_GET_REG, DXL_ID, DXL_REG, NB_BYTES]
+    MSG_TYPE_DXL_SET_REG = 11, // [MSG_TYPE_DXL_SET_REG, DXL_ID, DXL_REG, (VAL)+]
+    // From Dxl --> PC
+    MSG_TYPE_DXL_PUB_DATA = 15, // [MSG_TYPE_DXL_PUB_DATA, DXL_ID, DXL_REG, ERR1, ERR2, (VAL)+]
+
+    // Orbita
+
+    // FAN
+    // From PC -> Fan
+    MSG_TYPE_FAN_GET_STATE = 30, // [MSG_TYPE_FAN_GET_STATE, FAN_ID]
+    MSG_TYPE_FAN_SET_STATE = 31, // [MSG_TYPE_FAN_SET_STATE, FAN_ID, STATE]
+    // From Fan --> PC
+    MSG_TYPE_FAN_PUB_DATA = 35, // [MSG_TYPE_FAN_PUB_DATA, FAN_ID, STATE]
+
+    // Force Sensor
+    MSG_TYPE_FORCE_SENSOR_PUB = 40, // [MSG_TYPE_FORCE_SENSOR_GET_VAL, SENSOR_ID, VAL]
+
+    // SYSTEM
+    MSG_TYPE_KEEP_ALIVE = 200,
+    MSG_MODULE_ASSERT = 222, // [MSG_MODULE_ASSERT, CHAR1, CHAR2, ...]
+} msg_type_t;
+
+#endif

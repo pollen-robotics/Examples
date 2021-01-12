@@ -1,40 +1,32 @@
-/******************************************************************************
- * @file gate
- * @brief Container gate
- * @author Luos
- * @version 0.0.0
- ******************************************************************************/
-#include "main.h"
 #include "gate.h"
-#include "json_mnger.h"
-#include <stdio.h>
+#include "reachy.h"
+#include "myserial.h"
 
-/*******************************************************************************
- * Definitions
- ******************************************************************************/
-#ifdef USE_SERIAL
-static int serial_write(char *data, int len);
-#endif
-/*******************************************************************************
- * Variables
- ******************************************************************************/
-container_t *container;
-msg_t msg;
-uint8_t RxData;
-container_t *container_pointer;
-volatile msg_t pub_msg;
-volatile int pub = LUOS_PROTOCOL_NB;
-/*******************************************************************************
- * Function
- ******************************************************************************/
-/******************************************************************************
- * @brief init must be call in project init
- * @param None
- * @return None
- ******************************************************************************/
+#define NB_CONTAINERS 9
+
+#define NB_CONNECTED_BOARDS 1
+uint8_t board_ids[NB_CONNECTED_BOARDS] = {0};
+
+#define SEND_BUFF_SIZE 64
+uint8_t send_buff[SEND_BUFF_SIZE] = {0};
+
+#define RECV_BUFF_SIZE 64
+#define RECV_RING_BUFFER_SIZE 5
+volatile uint8_t recv_buff[RECV_RING_BUFFER_SIZE][RECV_BUFF_SIZE] = {0};
+static volatile uint8_t nb_recv_msg = 0;
+static volatile uint8_t recv_buff_read_index = 0;
+static volatile uint8_t recv_buff_write_index = 0;
+
+#define KEEP_ALIVE_PERIOD 1100
+static uint32_t keep_alive = 0;
+
+#define ASSERT(cond) _assert(cond, __FILE__, __LINE__)
+
+container_t *my_container;
+
 void Gate_Init(void)
 {
-    revision_t revision = {.unmap = REV};
+    status_led(0);
 
     LL_USART_ClearFlag_IDLE(USART3);
     LL_USART_EnableIT_IDLE(USART3);
@@ -42,82 +34,150 @@ void Gate_Init(void)
     LL_DMA_DisableIT_TC(DMA1, LL_DMA_CHANNEL_3);
     LL_DMA_DisableIT_HT(DMA1, LL_DMA_CHANNEL_3);
     LL_DMA_DisableIT_TE(DMA1, LL_DMA_CHANNEL_3);
-    LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)get_json_buf());
-    LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, JSON_BUFF_SIZE);
+    LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
+    LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, RECV_BUFF_SIZE);
     LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
     LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
     LL_USART_EnableDMAReq_RX(USART3);
-    container = Luos_CreateContainer(0, GATE_MOD, "gate", revision);
+
+    revision_t revision = {.unmap = REV};
+    my_container = Luos_CreateContainer(Dxl_MsgHandler, GATE_MOD, "gate", revision);
 }
 
-void json_send(char *json)
-{
-#ifdef USE_SERIAL
-    serial_write(json, strlen(json));
-#else
-    printf(json);
-#endif
-}
-/******************************************************************************
- * @brief loop must be call in project loop
- * @param None
- * @return None
- ******************************************************************************/
 void Gate_Loop(void)
 {
-    static unsigned int keepAlive = 0;
-    static volatile uint8_t detection_done = 0;
-    static char state = 0;
+    static uint8_t detection_done = 0;
 
-    // Check if there is a dead container
-    if (container->ll_container->dead_container_spotted)
+    if (!detection_done)
     {
-        char json[JSON_BUFF_SIZE] = {0};
-        exclude_container_to_json(container->ll_container->dead_container_spotted, json);
-        json_send(json);
-        container->ll_container->dead_container_spotted = 0;
-    }
-    if (detection_done)
-    {
-        char json[JSON_BUFF_SIZE] = {0};
-        state = !state;
-        format_data(container, json);
-        if (json[0] != '\0')
+        status_led(1);
+        while (1)
         {
-            json_send(json);
-            keepAlive = 0;
+            HAL_Delay(1000);
+
+            RoutingTB_DetectContainers(my_container);            
+
+            if (RoutingTB_GetLastContainer() != NB_CONTAINERS)
+            {
+                HAL_Delay(5000);
+                ASSERT (RoutingTB_GetLastContainer() == NB_CONTAINERS);
+            }
+            break;
+        }
+        // TODO: send to all instead (more messages but generic)
+        board_ids[0] = RoutingTB_IDFromType(DYNAMIXEL_MOD);
+        detection_done = 1;
+        status_led(0);
+    }
+
+    while (nb_recv_msg > 0)
+    {
+        handle_inbound_msg((uint8_t *)recv_buff[recv_buff_read_index]);
+
+        recv_buff_read_index++;
+        if (recv_buff_read_index == RECV_RING_BUFFER_SIZE)
+        {
+            recv_buff_read_index = 0;
+        }
+
+        __disable_irq();
+        nb_recv_msg--;
+        __enable_irq();
+    }
+}
+
+void Dxl_MsgHandler(container_t *src, msg_t *msg)
+{
+    if (msg->header.cmd == ASSERT)
+    {
+        uint32_t line;
+        memcpy(&line, msg->data, sizeof(uint32_t));
+
+        char file[64];
+        memcpy(file, msg->data + sizeof(uint32_t), msg->header.size - sizeof(uint32_t));
+
+        _assert(0, file, line);
+    }
+
+    if (!is_alive())
+    {
+        return;
+    }
+
+    if (msg->header.cmd == ASK_PUB_CMD)
+    {
+        send_buff[0] = 255;
+        send_buff[1] = 255;
+        send_buff[2] = msg->header.size;
+        memcpy(send_buff + 3, msg->data, msg->header.size);
+
+        serial_write(send_buff, msg->header.size + 3);
+    }
+}
+
+void handle_inbound_msg(uint8_t data[])
+{
+    ASSERT (data[0] == 255);
+    ASSERT (data[1] == 255);
+    uint8_t payload_size = data[2];
+
+    uint8_t msg_type = data[3];
+
+    if (msg_type == MSG_TYPE_KEEP_ALIVE)
+    {
+        msg_t keep_alive_msg;
+        keep_alive_msg.header.target_mode = IDACK;
+        keep_alive_msg.header.cmd = REGISTER;
+        keep_alive_msg.header.size = 1;
+        keep_alive_msg.data[0] = MSG_TYPE_KEEP_ALIVE;
+
+        for (int i=0; i < NB_CONNECTED_BOARDS; i++)
+        {
+            keep_alive_msg.header.target = board_ids[i];
+            Luos_SendMsg(my_container, &keep_alive_msg);
+        }
+
+        keep_alive = HAL_GetTick();
+    }
+
+    else if (
+        (msg_type == MSG_TYPE_DXL_GET_REG) || 
+        (msg_type == MSG_TYPE_DXL_SET_REG) ||
+        (msg_type == MSG_TYPE_FAN_GET_STATE) || 
+        (msg_type == MSG_TYPE_FAN_SET_STATE)
+        )
+    {
+        msg_t msg;
+        msg.header.target_mode = IDACK;
+        msg.header.cmd = REGISTER;
+        msg.header.size = payload_size;
+        memcpy(msg.data, data + 3, payload_size);
+
+        char alias[15];
+
+        if ((msg_type == MSG_TYPE_DXL_GET_REG) || (msg_type == MSG_TYPE_DXL_SET_REG))
+        {
+            sprintf(alias, "dxl_%d", data[4]);
+        }
+        else if ((msg_type == MSG_TYPE_FAN_GET_STATE) || (msg_type == MSG_TYPE_FAN_SET_STATE))
+        {
+            sprintf(alias, "fan_%d", data[4]);
         }
         else
         {
-            if (keepAlive > 200)
-            {
-                sprintf(json, "{}\n");
-                json_send(json);
-            }
-            else
-            {
-                keepAlive++;
-            }
+            ASSERT (0);
         }
-        collect_data(container);
+
+        uint16_t container_id = RoutingTB_IDFromAlias(alias);
+        ASSERT (container_id != 0xFFFF);
+        msg.header.target = container_id;
+
+        Luos_SendMsg(my_container, &msg);
     }
-    if (pub != LUOS_PROTOCOL_NB)
+    else 
     {
-        Luos_SendMsg(container_pointer, (msg_t *)&pub_msg);
-        pub = LUOS_PROTOCOL_NB;
+        ASSERT (0);
     }
-    // check if serial input messages ready and convert it into a luos message
-    send_cmds(container);
-    if (detection_ask)
-    {
-        char json[JSON_BUFF_SIZE * 2] = {0};
-        RoutingTB_DetectContainers(container);
-        routing_table_to_json(json);
-        json_send(json);
-        detection_done = 1;
-        detection_ask = 0;
-    }
-    HAL_Delay(get_delay());
 }
 
 void USART3_4_IRQHandler(void)
@@ -126,32 +186,61 @@ void USART3_4_IRQHandler(void)
     if (LL_USART_IsActiveFlag_IDLE(USART3))
     {
         LL_USART_ClearFlag_IDLE(USART3);
-        // check DMA data
-        check_json(JSON_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3) - 1);
 
         // reset DMA
         __disable_irq();
+
+        nb_recv_msg++;
+        recv_buff_write_index++;
+
+        if (recv_buff_write_index == RECV_RING_BUFFER_SIZE)
+        {
+            recv_buff_write_index = 0;
+        }
+
+        ASSERT (nb_recv_msg < RECV_RING_BUFFER_SIZE);
+
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
-        char *addr = get_json_buf();
-        LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)addr);
-        LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, JSON_BUFF_SIZE);
+
+        LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
+        LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, RECV_BUFF_SIZE);
         LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
-        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)addr);
+        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
         LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
         LL_USART_EnableDMAReq_RX(USART3);
+
         __enable_irq();
     }
 }
 
-#ifdef USE_SERIAL
-static int serial_write(char *data, int len)
+uint8_t is_alive()
 {
-    for (unsigned short i = 0; i < len; i++)
-    {
-        while (!LL_USART_IsActiveFlag_TXE(USART3))
-            ;
-        LL_USART_TransmitData8(USART3, *(data + i));
-    }
-    return 0;
+    return (HAL_GetTick() - keep_alive) <= KEEP_ALIVE_PERIOD;
 }
-#endif
+
+void _assert(uint8_t condition, char *file, uint32_t line)
+{
+    if (condition == 0)
+    {
+        status_led(1);
+
+        static char assert_msg[60];
+        sprintf(assert_msg, "Assert %s %ld", file, line);
+        uint8_t msg_len = strlen(assert_msg);
+        send_buff[0] = 255;
+        send_buff[1] = 255;
+        send_buff[2] = msg_len + 1;
+        send_buff[3] = MSG_MODULE_ASSERT;
+        memcpy(send_buff + 4, assert_msg, msg_len);
+
+        serial_write(send_buff, msg_len + 4);
+
+        __disable_irq();
+        while (1) ;
+    }
+}
+
+void status_led(uint8_t state)
+{
+    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, (state == 0));
+}
