@@ -70,7 +70,7 @@ void Gate_Loop(void)
         status_led(0);
     }
 
-    while (nb_recv_msg > 0)
+    if (nb_recv_msg > 0)
     {
         handle_inbound_msg((uint8_t *)recv_buff[recv_buff_read_index]);
 
