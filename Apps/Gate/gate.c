@@ -84,6 +84,8 @@ void Gate_Loop(void)
         nb_recv_msg--;
         __enable_irq();
     }
+
+    status_led(!is_alive());
 }
 
 void Dxl_MsgHandler(container_t *src, msg_t *msg)
