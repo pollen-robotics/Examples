@@ -6,8 +6,14 @@
 #include "main.h"
 #include "reachy.h"
 
-#define NB_DXL 8
-extern uint8_t DXL_IDS[NB_DXL];
+#define NB_DXL_MAX 10
+#define MAX_DXL_ID 100
+
+#define DXL_TIMEOUT 2  // in ms
+#define TEMP_PUBLISH_PERIOD 1000  // in ms
+
+#define KEEP_ALIVE_PERIOD 1100  // in ms
+
 
 void Dxl_Init(void);
 void Dxl_Loop(void);
@@ -15,6 +21,7 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg);
 
 uint8_t is_alive();
 
+void dxl_detect();
 uint8_t get_dxl_id(uint8_t id);
 uint8_t dxl_id_exists(uint8_t id);
 

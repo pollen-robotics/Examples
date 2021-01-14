@@ -285,6 +285,28 @@ servo_error_t servo_get_raw_page(uint8_t id, servo_register_t reg, uint8_t resul
 #endif
 }
 
+void servo_get_multiple_raw(uint8_t ids[], servo_register_t reg, 
+                            uint8_t *results, servo_error_t *errors, 
+                            int num_ids, int num_bytes_per_servo, int timeout_ms)
+{
+    for (int i=0; i < num_ids; i++)
+    {
+        if (num_bytes_per_servo == 1)
+        {
+            errors[i] = servo_get_raw_byte(ids[i], reg, results + i, timeout_ms);
+        }
+        else if (num_bytes_per_servo == 2)
+        {
+            errors[i] = servo_get_raw_word(ids[i], reg, (uint16_t *)(results + 2 * i), timeout_ms);
+        }
+        else
+        {
+            errors[i] = servo_get_raw_page(ids[i], reg, results + num_bytes_per_servo * i, num_bytes_per_servo, timeout_ms);
+        }
+    }
+}
+
+
 /*--------------------------------------------------------------------------------------------*/
 servo_error_t _servo_set_raw_byte(uint8_t id, servo_register_t reg, uint8_t value, int timeout_ms, uint8_t do_now)
 {

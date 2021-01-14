@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../.."
+		},
+		{
+			"path": "../../../../ROS/reachy_pyluos_hal"
 		}
 	],
 	"settings": {}

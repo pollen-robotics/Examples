@@ -57,14 +57,13 @@ void Gate_Loop(void)
 
             RoutingTB_DetectContainers(my_container);            
 
-            if (RoutingTB_GetLastContainer() != NB_CONTAINERS)
+            if (RoutingTB_GetLastContainer() > 0)
             {
-                HAL_Delay(5000);
-                ASSERT (RoutingTB_GetLastContainer() == NB_CONTAINERS);
+                break;
             }
-            break;
         }
         // TODO: send to all instead (more messages but generic)
+        // Use broadcast?
         board_ids[0] = RoutingTB_IDFromType(DYNAMIXEL_MOD);
         detection_done = 1;
         status_led(0);
@@ -142,12 +141,7 @@ void handle_inbound_msg(uint8_t data[])
         keep_alive = HAL_GetTick();
     }
 
-    else if (
-        (msg_type == MSG_TYPE_DXL_GET_REG) || 
-        (msg_type == MSG_TYPE_DXL_SET_REG) ||
-        (msg_type == MSG_TYPE_FAN_GET_STATE) || 
-        (msg_type == MSG_TYPE_FAN_SET_STATE)
-        )
+    else if (msg_type == MSG_TYPE_DXL_GET_REG)
     {
         msg_t msg;
         msg.header.target_mode = IDACK;
@@ -156,30 +150,56 @@ void handle_inbound_msg(uint8_t data[])
         memcpy(msg.data, data + 3, payload_size);
 
         char alias[15];
-
-        if ((msg_type == MSG_TYPE_DXL_GET_REG) || (msg_type == MSG_TYPE_DXL_SET_REG))
-        {
-            sprintf(alias, "dxl_%d", data[4]);
-        }
-        else if ((msg_type == MSG_TYPE_FAN_GET_STATE) || (msg_type == MSG_TYPE_FAN_SET_STATE))
-        {
-            sprintf(alias, "fan_%d", data[4]);
-        }
-        else
-        {
-            ASSERT (0);
-        }
-
+        uint8_t first_dxl_id = data[6];
+        sprintf(alias, "dxl_%d", first_dxl_id);
         uint16_t container_id = RoutingTB_IDFromAlias(alias);
         ASSERT (container_id != 0xFFFF);
         msg.header.target = container_id;
 
         Luos_SendMsg(my_container, &msg);
     }
-    else 
+    else
     {
         ASSERT (0);
     }
+    // else if (msg_type == MSG_TYPE_DXL_SET_MULTIPLE_REG)
+    // {
+    //     // [MSG_TYPE_DXL_SET_MULTIPLE_REG, DXL_REG, NB_BYTES, (DXL_ID, VAL_L, (VAL_H))+]
+    //     uint8_t nb_bytes = data[5];
+    //     ASSERT (nb_bytes == 1 || nb_bytes == 2);
+    //     uint8_t nb_ids = (payload_size - 3) / (nb_bytes + 1);
+
+    //     msg_t msg;
+    //     msg.header.target_mode = IDACK;
+    //     msg.header.cmd = REGISTER;
+    //     msg.header.size = 3 + nb_bytes;
+    //     // [MSG_TYPE_DXL_SET_REG, DXL_ID, DXL_REG, (VAL)+]
+
+    //     for (uint8_t i=0; i < nb_ids; i++)
+    //     {
+    //         uint8_t dxl_id = data[6 + i * (nb_bytes + 1)];
+
+    //         msg.data[0] = MSG_TYPE_DXL_SET_REG;
+    //         msg.data[1] = dxl_id;
+    //         msg.data[2] = data[4];
+    //         if (nb_bytes == 1)
+    //         {
+    //             msg.data[3] = data[7 + i * (nb_bytes + 1)];
+    //         }
+    //         else
+    //         {
+    //             memcpy(msg.data + 3, data + 7 + i * (nb_bytes + 1), nb_bytes);
+    //         }
+
+    //         char alias[15];
+    //         sprintf(alias, "dxl_%d", dxl_id);
+    //         uint16_t container_id = RoutingTB_IDFromAlias(alias);
+    //         ASSERT (container_id != 0xFFFF);
+    //         msg.header.target = container_id;
+
+    //         Luos_SendMsg(my_container, &msg);
+    //     }
+    // }
 }
 
 void USART3_4_IRQHandler(void)

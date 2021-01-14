@@ -508,6 +508,7 @@ typedef enum servo_register_enum
     servo_error_t servo_get_raw_byte(uint8_t id, servo_register_t reg, uint8_t *result, int timeout_ms);
     servo_error_t servo_get_raw_word(uint8_t id, servo_register_t reg, uint16_t *result, int timeout_ms);
     servo_error_t servo_get_raw_page(uint8_t id, servo_register_t reg, uint8_t result[], int num_bytes, int timeout_ms);
+    void servo_get_multiple_raw(uint8_t ids[], servo_register_t reg, uint8_t *results, servo_error_t *errors, int num_ids, int num_bytes_per_servo, int timeout_ms);
 
     servo_error_t servo_set_raw_byte(uint8_t id, servo_register_t reg, uint8_t value, int timeout_ms);
     servo_error_t servo_set_raw_word(uint8_t id, servo_register_t reg, uint16_t value, int timeout_ms);
