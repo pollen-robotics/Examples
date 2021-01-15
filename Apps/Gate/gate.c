@@ -141,8 +141,11 @@ void handle_inbound_msg(uint8_t data[])
         keep_alive = HAL_GetTick();
     }
 
-    else if (msg_type == MSG_TYPE_DXL_GET_REG)
+    else if ((msg_type == MSG_TYPE_DXL_GET_REG) || (msg_type == MSG_TYPE_DXL_SET_REG))
     {
+        // [MSG_TYPE_DXL_GET_REG, DXL_REG, NB_BYTES, (DXL_ID)+]
+        // [MSG_TYPE_DXL_SET_REG, DXL_REG, NB_BYTES, (DXL_ID, VAL_H, (VAL_L)*)+]
+
         msg_t msg;
         msg.header.target_mode = IDACK;
         msg.header.cmd = REGISTER;
@@ -162,44 +165,6 @@ void handle_inbound_msg(uint8_t data[])
     {
         ASSERT (0);
     }
-    // else if (msg_type == MSG_TYPE_DXL_SET_MULTIPLE_REG)
-    // {
-    //     // [MSG_TYPE_DXL_SET_MULTIPLE_REG, DXL_REG, NB_BYTES, (DXL_ID, VAL_L, (VAL_H))+]
-    //     uint8_t nb_bytes = data[5];
-    //     ASSERT (nb_bytes == 1 || nb_bytes == 2);
-    //     uint8_t nb_ids = (payload_size - 3) / (nb_bytes + 1);
-
-    //     msg_t msg;
-    //     msg.header.target_mode = IDACK;
-    //     msg.header.cmd = REGISTER;
-    //     msg.header.size = 3 + nb_bytes;
-    //     // [MSG_TYPE_DXL_SET_REG, DXL_ID, DXL_REG, (VAL)+]
-
-    //     for (uint8_t i=0; i < nb_ids; i++)
-    //     {
-    //         uint8_t dxl_id = data[6 + i * (nb_bytes + 1)];
-
-    //         msg.data[0] = MSG_TYPE_DXL_SET_REG;
-    //         msg.data[1] = dxl_id;
-    //         msg.data[2] = data[4];
-    //         if (nb_bytes == 1)
-    //         {
-    //             msg.data[3] = data[7 + i * (nb_bytes + 1)];
-    //         }
-    //         else
-    //         {
-    //             memcpy(msg.data + 3, data + 7 + i * (nb_bytes + 1), nb_bytes);
-    //         }
-
-    //         char alias[15];
-    //         sprintf(alias, "dxl_%d", dxl_id);
-    //         uint16_t container_id = RoutingTB_IDFromAlias(alias);
-    //         ASSERT (container_id != 0xFFFF);
-    //         msg.header.target = container_id;
-
-    //         Luos_SendMsg(my_container, &msg);
-    //     }
-    // }
 }
 
 void USART3_4_IRQHandler(void)
