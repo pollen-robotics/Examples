@@ -106,45 +106,32 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
         }
     }
 
-    // else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_DXL_SET_REG))
-    // {        
-    //     // [MSG_TYPE_DXL_SET_REG, DXL_ID, DXL_REG, (VAL)+]
+    else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_DXL_SET_REG))
+    {        
+        // [MSG_TYPE_DXL_SET_REG, DXL_REG, NB_BYTES, (DXL_ID, VAL_H, (VAL_L)*)+]
 
-    //     uint8_t dxl_id = msg->data[1];
-    //     LUOS_ASSERT (dxl_id_exists(dxl_id));
+        // SYNC_WRITE
+        uint8_t reg = msg->data[1];
+        uint8_t num_bytes_per_servo = msg->data[2];
 
-    //     uint8_t reg = msg->data[2];
+        uint8_t num_ids = (msg->header.size - 3) / (1 + num_bytes_per_servo);
 
-    //     if (reg == SERVO_REGISTER_PRESENT_ANGLE)
-    //     {
-    //         // store val in buff
-    //         // run sync write in dxl-loop
-    //     }
+        uint8_t dxl_ids[num_ids];
+        uint8_t values[num_ids * num_bytes_per_servo];
 
-    //     uint8_t val_size = msg->header.size - 3;
-    //     LUOS_ASSERT (val_size > 0);
+        for (uint8_t i=0; i < num_ids; i++)
+        {
+            uint8_t *data = msg->data + 3 + i * (1 + num_bytes_per_servo);
 
-    //     if (val_size == 1)
-    //     {
-    //         uint8_t val = msg->data[3];
-    //         servo_error_t error = servo_set_raw_byte(dxl_id, reg, val, DXL_TIMEOUT);
-    //         // LUOS_ASSERT (error == 0 || error == SERVO_ERROR_TIMEOUT || error == SERVO_ERROR_INVALID_RESPONSE);
-    //     }
-    //     else if (val_size == 2)
-    //     {
-    //         uint16_t value;
-    //         memcpy(&value, msg->data + 3, sizeof(uint16_t));
-    //         servo_error_t error = servo_set_raw_word(dxl_id, reg, value, DXL_TIMEOUT);
-    //         // LUOS_ASSERT (error == 0 || error == SERVO_ERROR_TIMEOUT || error == SERVO_ERROR_INVALID_RESPONSE);
-    //     }
-    //     else 
-    //     {
-    //         uint8_t values[val_size];
-    //         memcpy(values, msg->data + 3, val_size);
-    //         servo_error_t error = servo_set_raw_page(dxl_id, reg, values, val_size, DXL_TIMEOUT);
-    //         // LUOS_ASSERT (error == 0 || error == SERVO_ERROR_TIMEOUT || error == SERVO_ERROR_INVALID_RESPONSE);
-    //     }
-    // }
+            LUOS_ASSERT (dxl_id_exists(data[0]));
+            dxl_ids[i] = data[0];
+
+            memcpy(values + i * num_bytes_per_servo, data + 1, num_bytes_per_servo);
+        }
+
+        servo_error_t error = servo_set_multiple_raw(dxl_ids, reg, values, num_ids, num_bytes_per_servo);
+        LUOS_ASSERT (error == 0);
+    }
 }
 
 void dxl_detect()
