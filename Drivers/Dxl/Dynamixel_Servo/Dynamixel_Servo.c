@@ -1,5 +1,6 @@
 #include "Dynamixel_Servo.h"
 #include "usart.h"
+#include "dxl.h"
 
 /*--------------------------------------------------------------------------------------------*/
 #define HALF_DUPLEX_DIRECTION_OUTPUT GPIO_PIN_SET
@@ -338,22 +339,22 @@ servo_error_t _servo_set_raw_page(uint8_t id, servo_register_t reg, uint8_t valu
 {
     servo_instruction_t instruction = (do_now) ? SERVO_INSTRUCTION_WRITE_DATA : SERVO_INSTRUCTION_REG_WRITE;
 #ifdef V2
-    uint8_t params[num_bytes + 2];
+    uint8_t params_size = num_bytes + 2;
 #else
-    uint8_t params[num_bytes + 1];
+    uint8_t params_size = num_bytes + 1;
 #endif
-    uint8_t *p = params;
-    int n = num_bytes;
-    *p++ = reg;
-#ifdef V2
-    *p++ = 0;
-#endif
-    while (n-- < 0)
-    {
-        *p++ = *values++;
-    }
+    uint8_t params[params_size];
 
-    return servo_send_instruction(id, instruction, params, num_bytes, NULL, 0, timeout_ms);
+    params[0] = reg;
+
+    #ifdef V2
+        params[1] = 0;
+        memcpy(params + 2, values, num_bytes);
+    #else
+        memcpy(params + 1, values, num_bytes);
+    #endif
+
+    return servo_send_instruction(id, instruction, params, params_size , NULL, 0, timeout_ms);
 }
 
 /*--------------------------------------------------------------------------------------------*/
@@ -420,7 +421,7 @@ servo_error_t servo_set_multiple_raw(uint8_t ids[], servo_register_t start_reg, 
             *p++ = *bytes++;
     }
 
-    return servo_send_instruction(SERVO_BROADCAST_ID, SERVO_INSTRUCTION_SYNC_WRITE, params, num_params, NULL, 0, 0);
+    return servo_send_instruction(SERVO_BROADCAST_ID, SERVO_INSTRUCTION_SYNC_WRITE, params, num_params, NULL, 0, 1);
 }
 
 /*--------------------------------------------------------------------------------------------*/
