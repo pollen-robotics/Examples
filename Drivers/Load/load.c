@@ -50,19 +50,8 @@ void Load_MsgHandler(container_t *container, msg_t *msg)
 
 void send_load_to_gate(container_t *src, float load)
 {
-    // [MSG_TYPE_LOAD_PUB_DATA, (ID, FLOAT)+]
-
-    msg_t msg;
-    msg.header.target = 1;
-    msg.header.target_mode = ID;
-    msg.header.cmd = ASK_PUB_CMD;
-    msg.header.size = 6;
-    
-    msg.data[0] = MSG_TYPE_LOAD_PUB_DATA;
-    msg.data[1] = LOAD_SENSOR_ID;
-    memcpy(msg.data + 2, &load, sizeof(float));
-
-    Luos_SendMsg(src, &msg);
+    hx711_init(128);
+    luos_module_create(rx_load_cb, LOAD_MOD, "force_gripper", STRINGIFY(VERSION));
 }
 
 uint8_t is_alive()
