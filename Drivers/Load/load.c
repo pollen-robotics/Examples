@@ -1,102 +1,80 @@
-/******************************************************************************
- * @file load
- * @brief driver example a simple load
- * @author Luos
- * @version 0.0.0
- ******************************************************************************/
-#include "main.h"
 #include "load.h"
 #include "HX711.h"
-#include "string.h"
+#include "reachy.h"
 
-/*******************************************************************************
- * Definitions
- ******************************************************************************/
+static uint32_t keep_alive = 0;
+container_t *my_container;
 
-/*******************************************************************************
- * Variables
- ******************************************************************************/
-uint8_t new_data_ready = 0;
-volatile force_t load = 0.0;
-char have_to_tare = 0;
-
-/*******************************************************************************
- * Function
- ******************************************************************************/
-static void Load_MsgHandler(container_t *container, msg_t *msg);
-
-/******************************************************************************
- * @brief init must be call in project init
- * @param None
- * @return None
- ******************************************************************************/
 void Load_Init(void)
 {
-    revision_t revision = {.unmap = REV};
-    
     hx711_init(128);
-    Luos_CreateContainer(Load_MsgHandler, LOAD_MOD, "load_mod", revision);
+    hx711_set_scale(10000);
+
+    revision_t revision = {.unmap = REV};
+
+    char alias[15];
+    sprintf(alias, "load_%d", LOAD_SENSOR_ID);
+    my_container = Luos_CreateContainer(Load_MsgHandler, LOAD_MOD, alias, revision);
 }
-/******************************************************************************
- * @brief loop must be call in project loop
- * @param None
- * @return None
- ******************************************************************************/
+
 void Load_Loop(void)
 {
-    if (hx711_is_ready())
+    static uint32_t last_load_published = 0;
+
+    if (!is_alive())
     {
-        load = hx711_get_units(1);
-        new_data_ready = 1;
+        status_led(1);
+        return;
     }
-    if (have_to_tare)
+    status_led(0);
+
+    if ((HAL_GetTick() - last_load_published) > LOAD_PUB_PERIOD)
     {
-        hx711_tare(10);
-        have_to_tare = 0;
+        if (hx711_is_ready())
+        {
+            float load = hx711_get_units(1);
+            send_load_to_gate(my_container, load);
+
+            last_load_published = HAL_GetTick();
+        }
     }
 }
-/******************************************************************************
- * @brief Msg Handler call back when a msg receive for this container
- * @param Container destination
- * @param Msg receive
- * @return None
- ******************************************************************************/
-static void Load_MsgHandler(container_t *container, msg_t *msg)
+
+void Load_MsgHandler(container_t *container, msg_t *msg)
 {
-    if (msg->header.cmd == ASK_PUB_CMD)
+    if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_KEEP_ALIVE))
     {
-        if (new_data_ready)
-        {
-            msg_t pub_msg;
-            // fill the message infos
-            pub_msg.header.target_mode = ID;
-            pub_msg.header.target = msg->header.source;
-            ForceOD_ForceToMsg((force_t *)&load, &pub_msg);
-            Luos_SendMsg(container, &pub_msg);
-            new_data_ready = 0;
-        }
-        return;
+        keep_alive = HAL_GetTick();
     }
-    if (msg->header.cmd == REINIT)
+}
+
+void send_load_to_gate(container_t *src, float load)
+{
+    // [MSG_TYPE_LOAD_PUB_DATA, (ID, FLOAT)+]
+
+    msg_t msg;
+    msg.header.target = 1;
+    msg.header.target_mode = ID;
+    msg.header.cmd = ASK_PUB_CMD;
+    msg.header.size = 6;
+    
+    msg.data[0] = MSG_TYPE_LOAD_PUB_DATA;
+    msg.data[1] = LOAD_SENSOR_ID;
+    memcpy(msg.data + 2, &load, sizeof(float));
+
+    Luos_SendMsg(src, &msg);
+}
+
+uint8_t is_alive()
+{
+    if (keep_alive == 0)
     {
-        // tare
-        have_to_tare = 1;
-        return;
+        return 0;
     }
-    if (msg->header.cmd == RESOLUTION)
-    {
-        // put this value in scale
-        float value = 0.0;
-        memcpy(&value, msg->data, sizeof(value));
-        hx711_set_scale(value);
-        return;
-    }
-    if (msg->header.cmd == OFFSET)
-    {
-        // offset the load measurement using the scale parameter
-        force_t value = 0.0;
-        ForceOD_ForceFromMsg(&value, msg);
-        hx711_set_offset((long)(value * hx711_get_scale()));
-        return;
-    }
+    return (HAL_GetTick() - keep_alive) <= KEEP_ALIVE_PERIOD;
+}
+
+void status_led(uint8_t state)
+{
+    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, (state == 0));
 }

@@ -11,6 +11,9 @@ typedef enum
     // From Dxl --> PC
     MSG_TYPE_DXL_PUB_DATA = 15, // [MSG_TYPE_DXL_PUB_DATA, DXL_REG, NB_BYTES, (DXL_ID, ERR1, ERR2, (VAL)+)+]
 
+    // LOAD sensor
+    MSG_TYPE_LOAD_PUB_DATA = 20, // [MSG_TYPE_LOAD_PUB_DATA, (ID, FLOAT)+]
+
     // Orbita
 
     // FAN
