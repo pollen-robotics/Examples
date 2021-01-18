@@ -2,11 +2,6 @@
 #include "reachy.h"
 #include "myserial.h"
 
-#define NB_CONTAINERS 9
-
-#define NB_CONNECTED_BOARDS 1
-uint8_t board_ids[NB_CONNECTED_BOARDS] = {0};
-
 #define SEND_BUFF_SIZE 64
 uint8_t send_buff[SEND_BUFF_SIZE] = {0};
 
@@ -62,9 +57,6 @@ void Gate_Loop(void)
                 break;
             }
         }
-        // TODO: send to all instead (more messages but generic)
-        // Use broadcast?
-        board_ids[0] = RoutingTB_IDFromType(DYNAMIXEL_MOD);
         detection_done = 1;
         status_led(0);
     }
@@ -127,15 +119,20 @@ void handle_inbound_msg(uint8_t data[])
     if (msg_type == MSG_TYPE_KEEP_ALIVE)
     {
         msg_t keep_alive_msg;
+
         keep_alive_msg.header.target_mode = IDACK;
         keep_alive_msg.header.cmd = REGISTER;
         keep_alive_msg.header.size = 1;
         keep_alive_msg.data[0] = MSG_TYPE_KEEP_ALIVE;
 
-        for (int i=0; i < NB_CONNECTED_BOARDS; i++)
+        routing_table_t *tb = RoutingTB_Get();
+        for (uint16_t i=1; i < RoutingTB_GetLastEntry(); i++)
         {
-            keep_alive_msg.header.target = board_ids[i];
-            Luos_SendMsg(my_container, &keep_alive_msg);
+            if (tb[i].mode == NODE)
+            {
+                keep_alive_msg.header.target = RoutingTB_GetNodeID(i);
+                Luos_SendMsg(my_container, &keep_alive_msg);
+            }
         }
 
         keep_alive = HAL_GetTick();
