@@ -1,22 +1,16 @@
 {
     "name": "Fan",
-    "keywords": "robus,network,microservice,luos,operating system,os,embedded,communication,module,ST",
-    "description": "Fans control",
-    "version": "0.6.0",
-    "authors": {
-        "name": "Luos",
-        "url": "https://luos.io"
-    },
-    "licence": "MIT",
+    "version": "0.7.0",
     "build": {
         "flags": [
-            "-DVERSION=0.6.0"
+            "-I Fan",
+            "-DREV={0,7,0}"
         ]
     },
-    "dependencies":
-    [
+    "dependencies": [
         {
-        "name": "Luos"
+            "name": "luos/Luos",
+            "version": "^1.0.0"
         }
     ]
-} 
+}
