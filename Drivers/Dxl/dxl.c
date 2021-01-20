@@ -1,7 +1,7 @@
 #include "dxl.h"
 #include "pub_msg.h"
 #include "Dynamixel_Servo.h"
-
+#include "fan.h"
 
 static uint32_t keep_alive = 0;
 
@@ -10,6 +10,7 @@ static uint8_t nb_ids;
 uint8_t dxl_ids[NB_DXL_MAX];
 container_t *dxl_container[NB_DXL_MAX];
 
+uint8_t temperatures[NB_DXL_MAX];
 
 void Dxl_Init(void)
 {
@@ -52,6 +53,8 @@ void Dxl_Loop(void)
         servo_error_t error = servo_get_raw_byte(dxl_ids[temperature_id], SERVO_REGISTER_PRESENT_TEMPERATURE, &result, DXL_TIMEOUT);
         send_dxl_byte_to_gate(dxl_container[temperature_id], dxl_ids[temperature_id], SERVO_REGISTER_PRESENT_TEMPERATURE, error, result);
 
+        temperatures[temperature_id] = result;
+
         temperature_id++;
         if (temperature_id == nb_ids)
         {
@@ -59,6 +62,8 @@ void Dxl_Loop(void)
         }
 
         last_temperature_published = current_tick;
+
+        check_temperature();
     }
 }
 
@@ -173,6 +178,47 @@ uint8_t get_dxl_id(uint8_t id)
 uint8_t dxl_id_exists(uint8_t id)
 {
     return get_dxl_id(id) != 255;
+}
+
+
+uint8_t one_temp_above_limit()
+{
+    for (uint8_t i=0; i < nb_ids; i++)
+    {
+        if (temperatures[i] >= FAN_TRIGGER_TEMPERATURE)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+uint8_t all_below_limit()
+{
+    for (uint8_t i=0; i < nb_ids; i++)
+    {
+        if (temperatures[i] > FAN_SHUTDOWN_TEMPERATURE)
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+void check_temperature()
+{
+    if (one_temp_above_limit() == 1)
+    {
+        set_fan_state(SHOULDER_FAN_ID, 1);
+        set_fan_state(ELBOW_FAN_ID, 1);
+        set_fan_state(WRIST_FAN_ID, 1);
+    }
+    else if (all_below_limit() == 1)
+    {
+        set_fan_state(SHOULDER_FAN_ID, 0);
+        set_fan_state(ELBOW_FAN_ID, 0);
+        set_fan_state(WRIST_FAN_ID, 0);  
+    }
 }
 
 uint8_t is_alive()
