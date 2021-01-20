@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../../../../ROS/reachy_pyluos_hal"
+		},
+		{
+			"path": "../../../Luos"
 		}
 	],
 	"settings": {}
