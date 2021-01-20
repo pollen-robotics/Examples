@@ -14,6 +14,8 @@
 
 #define KEEP_ALIVE_PERIOD 1100  // in ms
 
+#define FAN_TRIGGER_TEMPERATURE 50  // in degree celsius
+#define FAN_SHUTDOWN_TEMPERATURE 45  // in degree celsius
 
 void Dxl_Init(void);
 void Dxl_Loop(void);
@@ -24,6 +26,7 @@ uint8_t is_alive();
 void dxl_detect();
 uint8_t get_dxl_id(uint8_t id);
 uint8_t dxl_id_exists(uint8_t id);
+void check_temperature();
 
 void status_led(uint8_t state);
 
