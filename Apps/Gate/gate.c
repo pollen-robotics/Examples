@@ -137,12 +137,12 @@ void handle_inbound_msg(uint8_t data[])
         // <-- [MSG_DETECTION_GET_NODES]
         // --> // [MSG_DETECTION_PUB_NODES, (NODE_ID)+]
 
-        uint8_t payload_size = 1 + RoutingTB_GetNodeNB();
+        uint8_t payload_size = 1 + RoutingTB_GetNodeNB() + 1;
         uint8_t payload[payload_size];
         payload[0] = MSG_DETECTION_PUB_NODES;
 
         routing_table_t *routing_table = RoutingTB_Get();
-        uint8_t i = 0;
+        uint8_t i = 1;
         for (uint16_t node_id=0; node_id < RoutingTB_GetLastEntry(); node_id++)
         {
             if (routing_table[node_id].mode == NODE)
