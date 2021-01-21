@@ -99,12 +99,7 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
 
     if (msg->header.cmd == ASK_PUB_CMD)
     {
-        send_buff[0] = 255;
-        send_buff[1] = 255;
-        send_buff[2] = msg->header.size;
-        memcpy(send_buff + 3, msg->data, msg->header.size);
-
-        serial_write(send_buff, msg->header.size + 3);
+        send_on_serial(msg->data, msg->header.size);
     }
 }
 
@@ -137,7 +132,78 @@ void handle_inbound_msg(uint8_t data[])
 
         keep_alive = HAL_GetTick();
     }
+    else if (msg_type == MSG_DETECTION_GET_NODES)
+    {
+        // <-- [MSG_DETECTION_GET_NODES]
+        // --> // [MSG_DETECTION_PUB_NODES, (NODE_ID)+]
 
+        uint8_t payload_size = 1 + RoutingTB_GetNodeNB();
+        uint8_t payload[payload_size];
+        payload[0] = MSG_DETECTION_PUB_NODES;
+
+        routing_table_t *routing_table = RoutingTB_Get();
+        uint8_t i = 0;
+        for (uint16_t node_id=0; node_id < RoutingTB_GetLastEntry(); node_id++)
+        {
+            if (routing_table[node_id].mode == NODE)
+            {
+                payload[i++] = node_id;
+            }
+        }
+        send_on_serial(payload, payload_size);
+    }
+    else if (msg_type == MSG_DETECTION_GET_CONTAINERS)
+    {
+        // <-- [MSG_DETECTION_GET_CONTAINERS, (NODE_ID)+]
+        // --> N x [MSG_DETECTION_PUB_CONTAINERS, NODE_ID, (CONTAINER_ID)+]
+        uint8_t num_nodes = payload_size - 1;
+        routing_table_t *routing_table = RoutingTB_Get();
+        for (uint8_t i=0; i < num_nodes; i++)
+        {
+            uint8_t node_id = data[4 + i];
+            uint8_t num_containers = RoutingTB_Get_ContainerNB(node_id);
+            uint8_t payload_size = 2 + num_containers;
+            uint8_t payload[payload_size];
+            payload[0] = MSG_DETECTION_PUB_CONTAINERS;
+            payload[1] = node_id;
+
+            for (uint8_t j=0; j < num_containers; j++)
+            {
+                uint8_t container_id = node_id + j + 1;
+                payload[2 + j] = routing_table[container_id].id;
+            }
+            send_on_serial(payload, payload_size);
+        }
+    }
+    else if (msg_type == MSG_DETECTION_GET_CONTAINER_INFO)
+    {
+        // <-- [MSG_DETECTION_GET_CONTAINER_INFO, (CONTAINER_ID)+]
+        // --> N x [MSG_DETECTION_PUB_CONTAINER_INFO, CONTAINER_ID, TYPE, ALIAS]
+        uint8_t num_containers = payload_size = 1;
+        routing_table_t *routing_table = RoutingTB_Get();
+        for (uint8_t i=0; i < num_containers; i++)
+        {
+            uint8_t container_id = data[4 + i];
+            ASSERT (
+                (routing_table[container_id].mode == CONTAINER)  ||
+                (routing_table[container_id].mode == NODE)
+            );
+
+            char *alias = RoutingTB_AliasFromId(container_id);
+            char *type = RoutingTB_StringFromType(RoutingTB_TypeFromID(container_id));
+
+            char info[32];
+            sprintf(info, "%s %s", alias, type);
+
+            uint8_t payload_size = 2 + strlen(info);
+            uint8_t payload[payload_size];
+            payload[0] = MSG_DETECTION_PUB_CONTAINER_INFO;
+            payload[1] = container_id;
+            memcpy(payload + 2, info, strlen(info));
+
+            send_on_serial(payload, payload_size);
+        }
+    }
     else if ((msg_type == MSG_TYPE_DXL_GET_REG) || (msg_type == MSG_TYPE_DXL_SET_REG))
     {
         // [MSG_TYPE_DXL_GET_REG, DXL_REG, NB_BYTES, (DXL_ID)+]
@@ -222,6 +288,16 @@ uint8_t is_alive()
     return (HAL_GetTick() - keep_alive) <= KEEP_ALIVE_PERIOD;
 }
 
+void send_on_serial(uint8_t payload[], uint8_t payload_size)
+{
+    send_buff[0] = 255;
+    send_buff[1] = 255;
+    send_buff[2] = payload_size;
+    memcpy(send_buff + 3, payload, payload_size);
+
+    serial_write(send_buff, payload_size + 3);
+}
+
 void _assert(uint8_t condition, char *file, uint32_t line)
 {
     if (condition == 0)
@@ -247,4 +323,24 @@ void _assert(uint8_t condition, char *file, uint32_t line)
 void status_led(uint8_t state)
 {
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, (state == 0));
+}
+
+uint16_t RoutingTB_Get_ContainerNB(uint16_t node_id)
+{
+    routing_table_t *routing_table = RoutingTB_Get();
+    ASSERT (routing_table[node_id].mode == NODE);
+
+    uint16_t nb = 0;
+    for (uint16_t i=node_id + 1; i < RoutingTB_GetLastEntry(); i++)
+    {
+        if (routing_table[i].mode == NODE)
+        {
+            break;
+        }
+        else if (routing_table[i].mode == CONTAINER)
+        {
+            nb++;
+        }
+    }
+    return nb;
 }
