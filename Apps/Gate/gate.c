@@ -244,6 +244,26 @@ void handle_inbound_msg(uint8_t data[])
 
         Luos_SendMsg(my_container, &msg);
     }
+    else if ((msg_type == MSG_TYPE_ORBITA_GET_REG) || (msg_type == MSG_TYPE_ORBITA_SET_REG))
+    {
+        // [MSG_TYPE_ORBITA_GET_REG, ORBITA_ID, REG_TYPE]
+        // [MSG_TYPE_ORBITA_SET_REG, ORBITA_ID, REG_TYPE, (MOTOR_ID, (VAL+))+]
+
+        msg_t msg;
+        msg.header.target_mode = IDACK;
+        msg.header.cmd = REGISTER;
+        msg.header.size = payload_size;
+        memcpy(msg.data, data + 3, payload_size);
+
+        char alias[15];
+        uint8_t orbita_id = data[4];
+        sprintf(alias, "orbita_%d", orbita_id);
+        uint16_t container_id = RoutingTB_IDFromAlias(alias);
+        ASSERT (container_id != 0xFFFF);
+        msg.header.target = container_id;
+
+        Luos_SendMsg(my_container, &msg);
+    }
     else
     {
         ASSERT (0);
