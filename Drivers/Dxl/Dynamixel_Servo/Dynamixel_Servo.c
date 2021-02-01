@@ -163,7 +163,7 @@ servo_error_t servo_set_multiple(uint8_t ids[], servo_register_t start_reg, floa
     int i, j, k;
     int addr = (int)start_reg;
 
-    uint8_t raw_bytes[num_ids * 2]; //worst case scenario
+    uint8_t raw_bytes[num_ids * 2]; // worst case scenario
     uint8_t *r = raw_bytes;
     int raw_anything;
 
@@ -406,18 +406,28 @@ servo_error_t servo_prepare_raw_page(uint8_t id, servo_register_t reg, uint8_t v
 /*--------------------------------------------------------------------------------------------*/
 servo_error_t servo_set_multiple_raw(uint8_t ids[], servo_register_t start_reg, uint8_t bytes[], int num_ids, int bytes_per_servo)
 {
-    int i, j;
+#ifdef V2
+    uint8_t num_params = num_ids * (bytes_per_servo + 1) + 4;
+    uint8_t params[num_params];
+    uint8_t *p = params;
+
+    *p++ = start_reg;
+    *p++ = 0;
+    *p++ = bytes_per_servo;
+    *p++ = 0;
+#else
     uint8_t num_params = num_ids * (bytes_per_servo + 1) + 2;
     uint8_t params[num_params];
     uint8_t *p = params;
 
     *p++ = start_reg;
     *p++ = bytes_per_servo;
+#endif
 
-    for (i = 0; i < num_ids; i++)
+    for (int i = 0; i < num_ids; i++)
     {
         *p++ = *ids++;
-        for (j = 0; j < bytes_per_servo; j++)
+        for (int j = 0; j < bytes_per_servo; j++)
             *p++ = *bytes++;
     }
 
