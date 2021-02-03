@@ -4,7 +4,7 @@
 #include "luos.h"
 
 #define RIGHT_FORCE_GRIPPER 10
-#define LEFT_FORCE_GRIPPER 11
+#define LEFT_FORCE_GRIPPER 20
 
 #define LOAD_SENSOR_ID RIGHT_FORCE_GRIPPER
 
