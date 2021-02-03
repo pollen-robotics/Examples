@@ -8,7 +8,8 @@ uint8_t send_buff[SEND_BUFF_SIZE] = {0};
 #define RECV_BUFF_SIZE 64
 #define RECV_RING_BUFFER_SIZE 5
 volatile uint8_t recv_buff[RECV_RING_BUFFER_SIZE][RECV_BUFF_SIZE] = {0};
-static volatile uint8_t nb_recv_msg = 0;
+volatile uint8_t recv_buff_msg_size[RECV_RING_BUFFER_SIZE] = {0};
+static volatile uint8_t nb_recv_buff = 0;
 static volatile uint8_t recv_buff_read_index = 0;
 static volatile uint8_t recv_buff_write_index = 0;
 
@@ -61,9 +62,25 @@ void Gate_Loop(void)
         status_led(0);
     }
 
-    if (nb_recv_msg > 0)
+    if (nb_recv_buff > 0)
     {
-        handle_inbound_msg((uint8_t *)recv_buff[recv_buff_read_index]);
+        uint8_t bytes_read = recv_buff_msg_size[recv_buff_read_index];
+        uint8_t *msg = (uint8_t *)recv_buff[recv_buff_read_index];
+
+        while (bytes_read > 0)
+        {
+            ASSERT (msg[0] == 255);
+            ASSERT (msg[1] == 255);
+
+            uint8_t payload_size = msg[2];
+            uint8_t msg_size = payload_size + 3;
+            ASSERT (msg_size <= bytes_read);
+
+            handle_inbound_msg(msg);
+
+            bytes_read -= msg_size;
+            msg += msg_size;
+        }
 
         recv_buff_read_index++;
         if (recv_buff_read_index == RECV_RING_BUFFER_SIZE)
@@ -72,7 +89,7 @@ void Gate_Loop(void)
         }
 
         __disable_irq();
-        nb_recv_msg--;
+        nb_recv_buff--;
         __enable_irq();
     }
 
@@ -105,8 +122,6 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
 
 void handle_inbound_msg(uint8_t data[])
 {
-    ASSERT (data[0] == 255);
-    ASSERT (data[1] == 255);
     uint8_t payload_size = data[2];
 
     uint8_t msg_type = data[3];
@@ -280,15 +295,17 @@ void USART3_4_IRQHandler(void)
         // reset DMA
         __disable_irq();
 
-        nb_recv_msg++;
+        ASSERT (nb_recv_buff < RECV_RING_BUFFER_SIZE);
+
+        recv_buff_msg_size[recv_buff_write_index] = RECV_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
+
+        nb_recv_buff++;
         recv_buff_write_index++;
 
         if (recv_buff_write_index == RECV_RING_BUFFER_SIZE)
         {
             recv_buff_write_index = 0;
         }
-
-        ASSERT (nb_recv_msg < RECV_RING_BUFFER_SIZE);
 
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
 
