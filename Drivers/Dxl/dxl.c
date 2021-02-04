@@ -137,6 +137,17 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
         servo_error_t error = servo_set_multiple_raw(dxl_ids, reg, values, num_ids, num_bytes_per_servo);
         LUOS_ASSERT (error == 0);
     }
+
+    else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_FAN_GET_STATE))
+    {
+        // [MSG_TYPE_FAN_GET_STATE, (FAN_ID)+]
+        Fan_MsgHandler(src, msg);
+    }
+    else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_FAN_SET_STATE))
+    {
+        // [MSG_TYPE_FAN_SET_STATE, (FAN_ID, STATE)+]
+        Fan_MsgHandler(src, msg);
+    }
 }
 
 void dxl_detect()

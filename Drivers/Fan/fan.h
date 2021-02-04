@@ -18,6 +18,8 @@ void Fan_Init(void);
 void Fan_Loop(void);
 void Fan_MsgHandler(container_t *src, msg_t *msg);
 
+uint8_t fan_id_from_dxl_id(uint8_t dxl_id);
+
 uint8_t get_fan_state(uint8_t fan_id);
 void set_fan_state(uint8_t fan_id, uint8_t state);
 

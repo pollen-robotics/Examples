@@ -252,7 +252,9 @@ void handle_inbound_msg(uint8_t data[])
 
         char alias[15];
         uint8_t first_fan_id = data[4];
-        sprintf(alias, "fan_%d", first_fan_id);
+        // We use the dxl container to circumvent
+        // https://github.com/pollen-robotics/Luos-modules/issues/13
+        sprintf(alias, "dxl_%d", first_fan_id);
         uint16_t container_id = RoutingTB_IDFromAlias(alias);
         ASSERT (container_id != 0xFFFF);
         msg.header.target = container_id;
