@@ -218,17 +218,28 @@ uint8_t all_below_limit()
 
 void check_temperature()
 {
-    if (one_temp_above_limit() == 1)
+    static uint8_t overheating = 0;
+    static uint8_t previous_state[3];
+
+    if ((!overheating) && (one_temp_above_limit() == 1))
     {
+        previous_state[0] = get_fan_state(SHOULDER_FAN_ID);
+        previous_state[1] = get_fan_state(ELBOW_FAN_ID);
+        previous_state[2] = get_fan_state(WRIST_FAN_ID);
+
         set_fan_state(SHOULDER_FAN_ID, 1);
         set_fan_state(ELBOW_FAN_ID, 1);
         set_fan_state(WRIST_FAN_ID, 1);
+
+        overheating = 1;
     }
-    else if (all_below_limit() == 1)
+    else if (overheating && (all_below_limit() == 1))
     {
-        set_fan_state(SHOULDER_FAN_ID, 0);
-        set_fan_state(ELBOW_FAN_ID, 0);
-        set_fan_state(WRIST_FAN_ID, 0);  
+        set_fan_state(SHOULDER_FAN_ID, previous_state[0]);
+        set_fan_state(ELBOW_FAN_ID, previous_state[1]);
+        set_fan_state(WRIST_FAN_ID, previous_state[2]);  
+
+        overheating = 0;
     }
 }
 
