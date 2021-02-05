@@ -37,7 +37,7 @@ void Gate_Init(void)
     LL_USART_EnableDMAReq_RX(USART3);
 
     revision_t revision = {.unmap = REV};
-    my_container = Luos_CreateContainer(Dxl_MsgHandler, GATE_MOD, "gate", revision);
+    my_container = Luos_CreateContainer(Gate_MsgHandler, GATE_MOD, "gate", revision);
 }
 
 void Gate_Loop(void)
@@ -96,7 +96,7 @@ void Gate_Loop(void)
     status_led(!is_alive());
 }
 
-void Dxl_MsgHandler(container_t *src, msg_t *msg)
+void Gate_MsgHandler(container_t *src, msg_t *msg)
 {
     if (msg->header.cmd == ASSERT)
     {
