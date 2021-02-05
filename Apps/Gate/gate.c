@@ -69,14 +69,22 @@ void Gate_Loop(void)
 
         while (bytes_read > 0)
         {
-            ASSERT (msg[0] == 255);
-            ASSERT (msg[1] == 255);
+            uint8_t header_offset = 0;
 
-            uint8_t payload_size = msg[2];
-            uint8_t msg_size = payload_size + 3;
+            ASSERT ((msg[header_offset] == 255));
+            header_offset++;
+
+            if (msg[header_offset] == 255)
+            {
+                header_offset++;
+            }
+
+            uint8_t payload_size = msg[header_offset];
+            header_offset++;
+            uint8_t msg_size = payload_size + header_offset;
             ASSERT (msg_size <= bytes_read);
 
-            handle_inbound_msg(msg);
+            handle_inbound_msg(msg + header_offset, payload_size);
 
             bytes_read -= msg_size;
             msg += msg_size;
@@ -120,11 +128,9 @@ void Gate_MsgHandler(container_t *src, msg_t *msg)
     }
 }
 
-void handle_inbound_msg(uint8_t data[])
+void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
 {
-    uint8_t payload_size = data[2];
-
-    uint8_t msg_type = data[3];
+    uint8_t msg_type = data[0];
 
     if (msg_type == MSG_TYPE_KEEP_ALIVE)
     {
@@ -175,7 +181,7 @@ void handle_inbound_msg(uint8_t data[])
         routing_table_t *routing_table = RoutingTB_Get();
         for (uint8_t i=0; i < num_nodes; i++)
         {
-            uint8_t node_id = data[4 + i];
+            uint8_t node_id = data[1 + i];
             uint8_t num_containers = RoutingTB_Get_ContainerNB(node_id);
             uint8_t payload_size = 2 + num_containers;
             uint8_t payload[payload_size];
@@ -198,7 +204,7 @@ void handle_inbound_msg(uint8_t data[])
         routing_table_t *routing_table = RoutingTB_Get();
         for (uint8_t i=0; i < num_containers; i++)
         {
-            uint8_t container_id = data[4 + i];
+            uint8_t container_id = data[1 + i];
             ASSERT (
                 (routing_table[container_id].mode == CONTAINER)  ||
                 (routing_table[container_id].mode == NODE)
@@ -228,10 +234,10 @@ void handle_inbound_msg(uint8_t data[])
         msg.header.target_mode = IDACK;
         msg.header.cmd = REGISTER;
         msg.header.size = payload_size;
-        memcpy(msg.data, data + 3, payload_size);
+        memcpy(msg.data, data, payload_size);
 
         char alias[15];
-        uint8_t first_dxl_id = data[6];
+        uint8_t first_dxl_id = data[3];
         sprintf(alias, "dxl_%d", first_dxl_id);
         uint16_t container_id = RoutingTB_IDFromAlias(alias);
         ASSERT (container_id != 0xFFFF);
@@ -248,10 +254,10 @@ void handle_inbound_msg(uint8_t data[])
         msg.header.target_mode = IDACK;
         msg.header.cmd = REGISTER;
         msg.header.size = payload_size;
-        memcpy(msg.data, data + 3, payload_size);
+        memcpy(msg.data, data, payload_size);
 
         char alias[15];
-        uint8_t first_fan_id = data[4];
+        uint8_t first_fan_id = data[1];
         // We use the dxl container to circumvent
         // https://github.com/pollen-robotics/Luos-modules/issues/13
         sprintf(alias, "dxl_%d", first_fan_id);
@@ -270,10 +276,10 @@ void handle_inbound_msg(uint8_t data[])
         msg.header.target_mode = IDACK;
         msg.header.cmd = REGISTER;
         msg.header.size = payload_size;
-        memcpy(msg.data, data + 3, payload_size);
+        memcpy(msg.data, data, payload_size);
 
         char alias[15];
-        uint8_t orbita_id = data[4];
+        uint8_t orbita_id = data[1];
         sprintf(alias, "orbita_%d", orbita_id);
         uint16_t container_id = RoutingTB_IDFromAlias(alias);
         ASSERT (container_id != 0xFFFF);
@@ -297,17 +303,15 @@ void USART3_4_IRQHandler(void)
         // reset DMA
         __disable_irq();
 
-        ASSERT (nb_recv_buff < RECV_RING_BUFFER_SIZE);
-
         recv_buff_msg_size[recv_buff_write_index] = RECV_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
 
-        nb_recv_buff++;
         recv_buff_write_index++;
-
         if (recv_buff_write_index == RECV_RING_BUFFER_SIZE)
         {
             recv_buff_write_index = 0;
         }
+        nb_recv_buff++;
+        ASSERT (nb_recv_buff < (RECV_RING_BUFFER_SIZE - 1));
 
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
 
