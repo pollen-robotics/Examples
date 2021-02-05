@@ -12,6 +12,10 @@ container_t *dxl_container[NB_DXL_MAX];
 
 uint8_t temperatures[NB_DXL_MAX];
 
+static uint8_t pos_publish_period;
+static uint8_t temp_publish_period;
+
+
 void Dxl_Init(void)
 {
     status_led(0);
@@ -31,23 +35,29 @@ void Dxl_Loop(void)
     }
     status_led(0);
 
-    // Send motor position (one motor per loop)
-    static uint8_t motor_id = 0;
-    uint16_t position;
-    servo_error_t error = servo_get_raw_word(dxl_ids[motor_id], SERVO_REGISTER_PRESENT_ANGLE, &position, DXL_TIMEOUT);
-    send_dxl_word_to_gate(dxl_container[motor_id], dxl_ids[motor_id], SERVO_REGISTER_PRESENT_ANGLE, error, position);
-    motor_id++;
-    if (motor_id == nb_ids)
-    {
-        motor_id = 0;
-    }
-
-    // Send motor temperature (one motor per ms)
-    static uint32_t last_temperature_published = 0;
-    static uint8_t temperature_id = 0;
     uint32_t current_tick = HAL_GetTick();
 
-    if ((current_tick - last_temperature_published) > TEMP_PUBLISH_PERIOD)
+    // Send motor position (one motor per POS_PUBLISH_PERIOD)
+    static uint32_t last_pos_published = 0;
+    static uint8_t motor_id = 0;
+    if ((current_tick - last_pos_published) >= pos_publish_period)
+    {
+        uint16_t position;
+        servo_error_t error = servo_get_raw_word(dxl_ids[motor_id], SERVO_REGISTER_PRESENT_ANGLE, &position, DXL_TIMEOUT);
+        send_dxl_word_to_gate(dxl_container[motor_id], dxl_ids[motor_id], SERVO_REGISTER_PRESENT_ANGLE, error, position);
+        motor_id++;
+        if (motor_id == nb_ids)
+        {
+            motor_id = 0;
+        }
+        last_pos_published = current_tick;
+    }
+
+    // Send motor temperature (one motor per TEMP_PUBLISH_PERIOD)
+    static uint32_t last_temperature_published = 0;
+    static uint8_t temperature_id = 0;
+
+    if ((current_tick - last_temperature_published) >= temp_publish_period)
     {
         uint8_t result;
         servo_error_t error = servo_get_raw_byte(dxl_ids[temperature_id], SERVO_REGISTER_PRESENT_TEMPERATURE, &result, DXL_TIMEOUT);
@@ -172,6 +182,9 @@ void dxl_detect()
 
         LUOS_ASSERT (nb_ids <= NB_DXL_MAX);
     }
+
+    pos_publish_period = POS_PUBLISH_PERIOD / nb_ids;
+    temp_publish_period = TEMP_PUBLISH_PERIOD / nb_ids;
 }
 
 uint8_t get_dxl_id(uint8_t id)
