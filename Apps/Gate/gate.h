@@ -8,8 +8,8 @@
 void Gate_Init(void);
 void Gate_Loop(void);
 
-void handle_inbound_msg(uint8_t msg[]);
 void Gate_MsgHandler(container_t *src, msg_t *msg);
+void handle_inbound_msg(uint8_t msg[], uint8_t msg_size);
 
 uint8_t is_alive();
 
