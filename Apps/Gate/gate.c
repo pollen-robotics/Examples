@@ -42,26 +42,6 @@ void Gate_Init(void)
 
 void Gate_Loop(void)
 {
-    static uint8_t detection_done = 0;
-
-    if (!detection_done)
-    {
-        status_led(1);
-        while (1)
-        {
-            HAL_Delay(1000);
-
-            RoutingTB_DetectContainers(my_container);            
-
-            if (RoutingTB_GetLastContainer() > 0)
-            {
-                break;
-            }
-        }
-        detection_done = 1;
-        status_led(0);
-    }
-
     if (nb_recv_buff > 0)
     {
         uint8_t bytes_read = recv_buff_msg_size[recv_buff_read_index];
@@ -152,6 +132,10 @@ void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
         }
 
         keep_alive = HAL_GetTick();
+    }
+    else if (msg_type == MSG_DETECTION_RUN)
+    {
+        RoutingTB_DetectContainers(my_container);
     }
     else if (msg_type == MSG_DETECTION_GET_NODES)
     {
