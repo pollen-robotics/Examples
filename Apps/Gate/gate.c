@@ -308,6 +308,21 @@ void USART3_4_IRQHandler(void)
         {
             recv_buff_write_index = 0;
         }
+        nb_recv_buff++;
+        // ASSERT (nb_recv_buff < (RECV_RING_BUFFER_SIZE - 1));
+        if (nb_recv_buff >= RECV_BUFF_SIZE - 1)
+        {
+            for (uint8_t i = 0; i < RECV_RING_BUFFER_SIZE; i++)
+            {
+                uint8_t tmp[RECV_BUFF_SIZE];
+                tmp[0] = 42;
+                tmp[1] = recv_buff_msg_size[i];
+                memcpy(tmp + 2, (uint8_t *)recv_buff[i], RECV_BUFF_SIZE - 2);
+                serial_write((uint8_t *)tmp, RECV_BUFF_SIZE);
+                HAL_Delay(10);
+            }
+            ASSERT (0);
+        }
 
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
 
