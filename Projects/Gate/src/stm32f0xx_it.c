@@ -23,6 +23,8 @@
 #include "stm32f0xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+extern TIM_HandleTypeDef    Input_Handle;
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -142,6 +144,13 @@ void SysTick_Handler(void)
 /**
   * @brief This function handles EXTI line 4 to 15 interrupts.
   */
+ void EXTI0_1_IRQHandler(void)
+{
+  /* As the following address is invalid (not mapped), a Hardfault exception
+  will be generated with an infinite loop and when the IWDG counter falls to 0
+  the IWDG reset occurs */
+  *(__IO uint32_t *) 0x00040001 = 0xFF;
+}
 void EXTI4_15_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI4_15_IRQn 0 */
@@ -153,6 +162,16 @@ void EXTI4_15_IRQHandler(void)
 
   /* USER CODE END EXTI4_15_IRQn 1 */
 }
+/**
+  * @brief  This function handles TIM14 global interrupt request.
+  * @param  None
+  * @retval None
+  */
+void TIM14_IRQHandler(void)
+{ 
+  HAL_TIM_IRQHandler(&Input_Handle);
+}
+
 
 /**
   * @brief This function handles DMA1 channel 2 and 3 interrupts.
