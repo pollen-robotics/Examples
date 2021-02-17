@@ -79,6 +79,32 @@ void HAL_MspInit(void)
 
 /* USER CODE BEGIN 1 */
 
+void HAL_TIM_IC_MspInit(TIM_HandleTypeDef *htim)
+{
+
+  RCC_OscInitTypeDef RCC_OscInitStruct;
+  
+  /*## Enable peripherals and GPIO Clocks ####################################*/
+  /* RCC LSI clock enable */
+  RCC_OscInitStruct.OscillatorType =  RCC_OSCILLATORTYPE_LSI;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    /* Initialization Error */
+    Error_Handler();
+  }
+
+
+  /* TIMx Peripheral clock enable */
+  __HAL_RCC_TIM14_CLK_ENABLE();
+  
+  /*## Configure the NVIC for TIMx ###########################################*/
+  HAL_NVIC_SetPriority(TIM14_IRQn,0,0);
+  
+  /* Enable the TIM14 global Interrupt */
+  HAL_NVIC_EnableIRQ(TIM14_IRQn);
+}
 /* USER CODE END 1 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

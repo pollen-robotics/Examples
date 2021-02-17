@@ -1,6 +1,7 @@
 #include "gate.h"
 #include "reachy.h"
 #include "myserial.h"
+#include "watchdog.h"
 
 #define SEND_BUFF_SIZE 64
 uint8_t send_buff[SEND_BUFF_SIZE] = {0};
@@ -22,6 +23,7 @@ container_t *my_container;
 
 void Gate_Init(void)
 {
+    watchdog_Init();
     status_led(0);
 
     LL_USART_ClearFlag_IDLE(USART3);
@@ -42,6 +44,8 @@ void Gate_Init(void)
 
 void Gate_Loop(void)
 {
+    watchdog_Refresh();
+
     if (nb_recv_buff > 0)
     {
         uint8_t bytes_read = recv_buff_msg_size[recv_buff_read_index];
