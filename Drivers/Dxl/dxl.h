@@ -10,7 +10,7 @@
 #define MAX_DXL_ID 100
 
 #define DXL_TIMEOUT 2  // in ms
-#define POS_PUBLISH_PERIOD 10 // in ms
+#define DEFAULT_POS_PUBLISH_PERIOD 10 // in ms
 #define TEMP_PUBLISH_PERIOD 5000  // in ms
 
 #define KEEP_ALIVE_PERIOD 1100  // in ms
