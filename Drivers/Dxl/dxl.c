@@ -191,8 +191,8 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
     }
     else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_DXL_SET_POS_PUB_PERIOD))
     {
-        // [MSG_TYPE_DXL_SET_POS_PUB_PERIOD, PERIOD]
-        pos_publish_period_per_motor = msg->data[1];
+        // MSG_TYPE_DXL_SET_POS_PUB_PERIOD, DXL_ID, PERIOD]
+        pos_publish_period_per_motor = msg->data[2];
         pos_publish_period = pos_publish_period_per_motor / nb_ids;
     }
 }
