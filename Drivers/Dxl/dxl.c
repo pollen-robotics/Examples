@@ -174,13 +174,13 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
     }
     else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_DXL_DETECT))
     {
-        // [MSG_TYPE_DXL_DETECT]
+        // [MSG_TYPE_DXL_DETECT DXL_ID]
         LUOS_ASSERT (!is_alive());
         dxl_detect();
     }
     else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_DXL_SET_BAUDRATE))
     {
-        // [MSG_TYPE_DXL_SET_BAUDRATE BAUD_H BAUD_L]
+        // [MSG_TYPE_DXL_SET_BAUDRATE DXL_ID BAUD_1 BAUD_2 BAUD_3 BAUD_4]
         LUOS_ASSERT (!is_alive());
 
         uint32_t baudrate;
