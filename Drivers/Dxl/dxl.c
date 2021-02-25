@@ -13,12 +13,19 @@ container_t *dxl_container[NB_DXL_MAX];
 uint8_t temperatures[NB_DXL_MAX];
 
 static uint8_t pos_publish_period;
+static uint8_t pos_publish_period_per_motor;
 static uint8_t temp_publish_period;
 
+static uint32_t last_pos_published = 0;
+static uint8_t motor_id = 0;
+static uint32_t last_temperature_published = 0;
+static uint8_t temperature_id = 0;
 
 void Dxl_Init(void)
 {
     status_led(0);
+
+    pos_publish_period_per_motor = DEFAULT_POS_PUBLISH_PERIOD;
 
     servo_init(1000000);
     HAL_Delay(500);
@@ -38,8 +45,6 @@ void Dxl_Loop(void)
     uint32_t current_tick = HAL_GetTick();
 
     // Send motor position (one motor per POS_PUBLISH_PERIOD)
-    static uint32_t last_pos_published = 0;
-    static uint8_t motor_id = 0;
     if ((current_tick - last_pos_published) >= pos_publish_period)
     {
         uint16_t position;
@@ -54,9 +59,6 @@ void Dxl_Loop(void)
     }
 
     // Send motor temperature (one motor per TEMP_PUBLISH_PERIOD)
-    static uint32_t last_temperature_published = 0;
-    static uint8_t temperature_id = 0;
-
     if ((current_tick - last_temperature_published) >= temp_publish_period)
     {
         uint8_t result;
@@ -144,8 +146,20 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
             memcpy(values + i * num_bytes_per_servo, data + 1, num_bytes_per_servo);
         }
 
-        servo_error_t error = servo_set_multiple_raw(dxl_ids, reg, values, num_ids, num_bytes_per_servo);
-        LUOS_ASSERT (error == 0);
+        // Changing the baudrate does not seem to work on sync read.
+        if (reg == SERVO_REGISTER_BAUD_RATE)
+        {
+            for (uint8_t id=0; id < nb_ids; id++)
+            {
+                servo_error_t error = servo_set_raw_byte(dxl_ids[id], reg, values[id], 100);
+                LUOS_ASSERT (error == 0);
+            }
+        }
+        else 
+        {
+            servo_error_t error = servo_set_multiple_raw(dxl_ids, reg, values, num_ids, num_bytes_per_servo);
+            LUOS_ASSERT (error == 0);
+        }
     }
 
     else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_FAN_GET_STATE))
@@ -158,10 +172,35 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
         // [MSG_TYPE_FAN_SET_STATE, (FAN_ID, STATE)+]
         Fan_MsgHandler(src, msg);
     }
+    else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_DXL_DETECT))
+    {
+        // [MSG_TYPE_DXL_DETECT DXL_ID]
+        LUOS_ASSERT (!is_alive());
+        dxl_detect();
+    }
+    else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_DXL_SET_BAUDRATE))
+    {
+        // [MSG_TYPE_DXL_SET_BAUDRATE DXL_ID BAUD_1 BAUD_2 BAUD_3 BAUD_4]
+        LUOS_ASSERT (!is_alive());
+
+        uint32_t baudrate;
+        memcpy(&baudrate, msg->data + 2, sizeof(uint32_t));
+        
+        servo_init(baudrate);
+        HAL_Delay(500);
+    }
+    else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_DXL_SET_POS_PUB_PERIOD))
+    {
+        // MSG_TYPE_DXL_SET_POS_PUB_PERIOD, DXL_ID, PERIOD]
+        pos_publish_period_per_motor = msg->data[2];
+        pos_publish_period = pos_publish_period_per_motor / nb_ids;
+    }
 }
 
 void dxl_detect()
 {
+    Luos_ContainersClear();
+
     revision_t revision = {.unmap = REV};
     memset(dxl_container, 0, NB_DXL_MAX * sizeof(container_t *));
     memset(dxl_ids, 0, NB_DXL_MAX * sizeof(uint8_t));
@@ -183,8 +222,23 @@ void dxl_detect()
         LUOS_ASSERT (nb_ids <= NB_DXL_MAX);
     }
 
-    pos_publish_period = POS_PUBLISH_PERIOD / nb_ids;
-    temp_publish_period = TEMP_PUBLISH_PERIOD / nb_ids;
+    if (nb_ids > 0)
+    {
+        pos_publish_period = pos_publish_period_per_motor / nb_ids;
+        temp_publish_period = TEMP_PUBLISH_PERIOD / nb_ids;
+    }
+    else 
+    {
+        pos_publish_period = 255;
+        temp_publish_period = 255;
+
+        Luos_CreateContainer(Dxl_MsgHandler, DYNAMIXEL_MOD, "void_dxl", revision);
+    }
+
+    last_pos_published = 0;
+    motor_id = 0;
+    last_temperature_published = 0;
+    temperature_id = 0;
 }
 
 uint8_t get_dxl_id(uint8_t id)
@@ -203,7 +257,6 @@ uint8_t dxl_id_exists(uint8_t id)
 {
     return get_dxl_id(id) != 255;
 }
-
 
 uint8_t one_temp_above_limit()
 {

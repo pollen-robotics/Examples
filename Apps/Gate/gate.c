@@ -17,6 +17,8 @@ static volatile uint8_t recv_buff_write_index = 0;
 #define KEEP_ALIVE_PERIOD 1100
 static uint32_t keep_alive = 0;
 
+#define DXL_BROADCAST_ID 0xFE
+
 #define ASSERT(cond) _assert(cond, __FILE__, __LINE__)
 
 container_t *my_container;
@@ -99,11 +101,6 @@ void Gate_MsgHandler(container_t *src, msg_t *msg)
         memcpy(file, msg->data + sizeof(uint32_t), msg->header.size - sizeof(uint32_t));
 
         _assert(0, file, line);
-    }
-
-    if (!is_alive())
-    {
-        return;
     }
 
     if (msg->header.cmd == ASK_PUB_CMD)
@@ -232,6 +229,42 @@ void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
         msg.header.target = container_id;
 
         Luos_SendMsg(my_container, &msg);
+    }
+    else if (
+        (msg_type == MSG_TYPE_DXL_DETECT) ||
+        (msg_type == MSG_TYPE_DXL_SET_BAUDRATE) ||
+        (msg_type == MSG_TYPE_DXL_SET_POS_PUB_PERIOD)
+    )
+    {
+        // [MSG_TYPE_DXL_DETECT, DXL_ID]
+        // [MSG_TYPE_DXL_SET_BAUDRATE, DXL_ID, BAUD_1, BAUD_2, BAUD_3, BAUD_4]
+        // [MSG_TYPE_DXL_SET_POS_PUB_PERIOD, DXL_ID, PERIOD]
+
+        msg_t msg;
+        msg.header.target_mode = IDACK;
+        msg.header.cmd = REGISTER;
+        msg.header.size = payload_size;
+        memcpy(msg.data, data, payload_size);
+
+        uint8_t dxl_id = data[1];
+        if (dxl_id == DXL_BROADCAST_ID)
+        {
+            uint16_t container_id = RoutingTB_IDFromType(DYNAMIXEL_MOD);
+            ASSERT (container_id != 0xFFFF);            
+            msg.header.target = container_id;
+
+            Luos_SendMsg(my_container, &msg);
+        }
+        else 
+        {
+            char alias[15];
+            sprintf(alias, "dxl_%d", dxl_id);
+            uint16_t container_id = RoutingTB_IDFromAlias(alias);
+            ASSERT (container_id != 0xFFFF);
+            msg.header.target = container_id;
+
+            Luos_SendMsg(my_container, &msg);
+        }
     }
     else if ((msg_type == MSG_TYPE_FAN_GET_STATE) || (msg_type == MSG_TYPE_FAN_SET_STATE))
     {
