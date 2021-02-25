@@ -65,7 +65,10 @@ void Dxl_Loop(void)
         servo_error_t error = servo_get_raw_byte(dxl_ids[temperature_id], SERVO_REGISTER_PRESENT_TEMPERATURE, &result, DXL_TIMEOUT);
         send_dxl_byte_to_gate(dxl_container[temperature_id], dxl_ids[temperature_id], SERVO_REGISTER_PRESENT_TEMPERATURE, error, result);
 
-        temperatures[temperature_id] = result;
+        if (error == SERVO_NO_ERROR)
+        {
+            temperatures[temperature_id] = result;
+        }
 
         temperature_id++;
         if (temperature_id == nb_ids)
