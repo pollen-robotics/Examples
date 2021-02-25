@@ -22,7 +22,7 @@ static uint32_t last_temperature_published = 0;
 static uint8_t temperature_id = 0;
 
 void Dxl_Init(void)
-{    
+{
     status_led(0);
 
     pos_publish_period_per_motor = DEFAULT_POS_PUBLISH_PERIOD;

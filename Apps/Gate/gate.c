@@ -246,7 +246,6 @@ void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
         msg.header.size = payload_size;
         memcpy(msg.data, data, payload_size);
 
-        char alias[15];
         uint8_t dxl_id = data[1];
         if (dxl_id == DXL_BROADCAST_ID)
         {
@@ -258,6 +257,7 @@ void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
         }
         else 
         {
+            char alias[15];
             sprintf(alias, "dxl_%d", dxl_id);
             uint16_t container_id = RoutingTB_IDFromAlias(alias);
             ASSERT (container_id != 0xFFFF);
@@ -270,6 +270,7 @@ void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
     {
         // [MSG_TYPE_FAN_GET_STATE, (FAN_ID)+]
         // [MSG_TYPE_FAN_SET_STATE, (FAN_ID, STATE)+]
+
         msg_t msg;
         msg.header.target_mode = IDACK;
         msg.header.cmd = REGISTER;
