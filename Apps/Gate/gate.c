@@ -6,7 +6,7 @@
 #define SEND_BUFF_SIZE 64
 uint8_t send_buff[SEND_BUFF_SIZE] = {0};
 
-#define RECV_BUFF_SIZE 64
+#define RECV_BUFF_SIZE 256
 #define RECV_RING_BUFFER_SIZE 15
 volatile uint8_t recv_buff[RECV_RING_BUFFER_SIZE][RECV_BUFF_SIZE] = {0};
 volatile uint8_t recv_buff_msg_size[RECV_RING_BUFFER_SIZE] = {0};
