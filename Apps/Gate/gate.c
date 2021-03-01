@@ -371,24 +371,28 @@ void usart_rx_check()
     // reset DMA
     __disable_irq();
 
-    recv_buff_msg_size[recv_buff_write_index] = RECV_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
-
-    recv_buff_write_index++;
-    if (recv_buff_write_index == RECV_RING_BUFFER_SIZE)
+    uint8_t bytes_received = RECV_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
+    if (bytes_received > 0)
     {
-        recv_buff_write_index = 0;
+        recv_buff_msg_size[recv_buff_write_index] = bytes_received;
+
+        recv_buff_write_index++;
+        if (recv_buff_write_index == RECV_RING_BUFFER_SIZE)
+        {
+            recv_buff_write_index = 0;
+        }
+        nb_recv_buff++;
+        ASSERT (nb_recv_buff < RECV_RING_BUFFER_SIZE);
+
+        LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
+
+        LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
+        LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, RECV_BUFF_SIZE);
+        LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
+        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
+        LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
+        LL_USART_EnableDMAReq_RX(USART3);
     }
-    nb_recv_buff++;
-    ASSERT (nb_recv_buff < RECV_RING_BUFFER_SIZE);
-
-    LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
-
-    LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
-    LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, RECV_BUFF_SIZE);
-    LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
-    LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
-    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
-    LL_USART_EnableDMAReq_RX(USART3);
 
     __enable_irq();
 }
