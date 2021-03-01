@@ -28,17 +28,21 @@ void Gate_Init(void)
     watchdog_Init();
     status_led(0);
 
-    LL_USART_ClearFlag_IDLE(USART3);
-    LL_USART_EnableIT_IDLE(USART3);
     NVIC_DisableIRQ(DMA1_Channel2_3_IRQn);
-    LL_DMA_DisableIT_TC(DMA1, LL_DMA_CHANNEL_3);
+    LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_3);
     LL_DMA_DisableIT_HT(DMA1, LL_DMA_CHANNEL_3);
     LL_DMA_DisableIT_TE(DMA1, LL_DMA_CHANNEL_3);
     LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
     LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, RECV_BUFF_SIZE);
     LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
-    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
+    NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
+
+    LL_USART_ClearFlag_IDLE(USART3);
+    LL_USART_EnableIT_IDLE(USART3);
     LL_USART_EnableDMAReq_RX(USART3);
+
+    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
+    LL_USART_Enable(USART3);
 
     revision_t revision = {.unmap = REV};
     my_container = Luos_CreateContainer(Gate_MsgHandler, GATE_MOD, "gate", revision);
