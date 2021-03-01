@@ -318,42 +318,50 @@ void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
     }
 }
 
+void usart_rx_check()
+{
+    // reset DMA
+    __disable_irq();
+
+    recv_buff_msg_size[recv_buff_write_index] = RECV_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
+
+    recv_buff_write_index++;
+    if (recv_buff_write_index == RECV_RING_BUFFER_SIZE)
+    {
+        recv_buff_write_index = 0;
+    }
+    nb_recv_buff++;
+    ASSERT (nb_recv_buff < RECV_RING_BUFFER_SIZE);
+
+    LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
+
+    LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
+    LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, RECV_BUFF_SIZE);
+    LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
+    LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
+    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
+    LL_USART_EnableDMAReq_RX(USART3);
+
+    __enable_irq();
+}
+
 void USART3_4_IRQHandler(void)
 {
     // check if we receive an IDLE on usart3
     if (LL_USART_IsActiveFlag_IDLE(USART3))
     {
         LL_USART_ClearFlag_IDLE(USART3);
-
-        // reset DMA
-        __disable_irq();
-
-        recv_buff_msg_size[recv_buff_write_index] = RECV_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
-
-        recv_buff_write_index++;
-        if (recv_buff_write_index == RECV_RING_BUFFER_SIZE)
-        {
-            recv_buff_write_index = 0;
-        }
-        nb_recv_buff++;
-        ASSERT (nb_recv_buff < (RECV_RING_BUFFER_SIZE - 1));
-
-        LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
-
-        LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
-        LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, RECV_BUFF_SIZE);
-        LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
-        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
-        LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
-        LL_USART_EnableDMAReq_RX(USART3);
-
-        __enable_irq();
+        usart_rx_check();
     }
 }
 
-uint8_t is_alive()
+void DMA1_Channel2_3_IRQHandler(void)
 {
-    return (HAL_GetTick() - keep_alive) <= KEEP_ALIVE_PERIOD;
+    if (LL_DMA_IsEnabledIT_TC(DMA1, LL_DMA_CHANNEL_3) && LL_DMA_IsActiveFlag_TC3(DMA1)) 
+    {
+        LL_DMA_ClearFlag_TC3(DMA1);             /* Clear transfer complete flag */
+        usart_rx_check();                       /* Check for data to process */
+    }
 }
 
 void send_on_serial(uint8_t payload[], uint8_t payload_size)
