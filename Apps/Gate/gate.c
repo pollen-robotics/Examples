@@ -14,6 +14,9 @@ static volatile uint8_t nb_recv_buff = 0;
 static volatile uint8_t recv_buff_read_index = 0;
 static volatile uint8_t recv_buff_write_index = 0;
 
+static uint8_t remaining_buff_read[RECV_BUFF_SIZE + RECV_BUFF_SIZE] = {0};
+static uint8_t remaining_buff_read_index = 0;
+
 #define KEEP_ALIVE_PERIOD 1100
 static uint32_t keep_alive = 0;
 
@@ -53,31 +56,46 @@ void Gate_Loop(void)
     watchdog_Refresh();
 
     if (nb_recv_buff > 0)
-    {
-        uint8_t bytes_read = recv_buff_msg_size[recv_buff_read_index];
-        uint8_t *msg = (uint8_t *)recv_buff[recv_buff_read_index];
+    {        
+        uint8_t *msg_buff = (uint8_t *)recv_buff[recv_buff_read_index];
+        uint8_t buff_length = recv_buff_msg_size[recv_buff_read_index];
 
-        while (bytes_read > 0)
+        uint8_t header_offset;
+        uint8_t payload_size;
+
+        if (remaining_buff_read_index > 0)
         {
-            uint8_t header_offset = 0;
+            memcpy(remaining_buff_read + remaining_buff_read_index, msg_buff, buff_length);
+            uint8_t msg_complete = get_next_message_length(remaining_buff_read, remaining_buff_read_index + buff_length, &header_offset, &payload_size);
+            ASSERT (msg_complete == 1);
+            handle_inbound_msg(remaining_buff_read + header_offset, payload_size);
 
-            ASSERT ((msg[header_offset] == 255));
-            header_offset++;
+            uint8_t msg_size = header_offset + payload_size;
+            uint8_t offset = msg_size - remaining_buff_read_index;
 
-            if (msg[header_offset] == 255)
+            msg_buff += offset;
+            buff_length -= offset;
+
+            remaining_buff_read_index = 0;
+        }
+
+        while (buff_length > 0)
+        {
+            uint8_t msg_complete = get_next_message_length(msg_buff, buff_length, &header_offset, &payload_size);
+            if (msg_complete == 1)
             {
-                header_offset++;
+                handle_inbound_msg(msg_buff + header_offset, payload_size);
+
+                uint8_t msg_size = header_offset + payload_size;
+                buff_length -= msg_size;
+                msg_buff += msg_size;
             }
-
-            uint8_t payload_size = msg[header_offset];
-            header_offset++;
-            uint8_t msg_size = payload_size + header_offset;
-            ASSERT (msg_size <= bytes_read);
-
-            handle_inbound_msg(msg + header_offset, payload_size);
-
-            bytes_read -= msg_size;
-            msg += msg_size;
+            else 
+            {
+                memcpy(remaining_buff_read, msg_buff, buff_length);
+                remaining_buff_read_index = buff_length;
+                break;
+            }
         }
 
         recv_buff_read_index++;
@@ -111,6 +129,36 @@ void Gate_MsgHandler(container_t *src, msg_t *msg)
     {
         send_on_serial(msg->data, msg->header.size);
     }
+}
+
+uint8_t get_next_message_length(uint8_t msg_buff[], uint8_t buff_length, uint8_t *header_offset_res, uint8_t *payload_size_res)
+{
+    if (buff_length < 3)
+    {
+        return 0;
+    }
+
+    uint8_t header_offset = 0;
+    ASSERT ((msg_buff[header_offset] == 255));
+    header_offset++;
+
+    if (msg_buff[header_offset] == 255)
+    {
+        header_offset++;
+    }
+    uint8_t payload_size = msg_buff[header_offset];
+    header_offset++;
+
+    uint8_t msg_size = payload_size + header_offset;
+
+    if (msg_size > buff_length)
+    {
+        return 0;
+    }
+    *header_offset_res = header_offset;
+    *payload_size_res = payload_size;
+
+    return 1;
 }
 
 void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
