@@ -412,6 +412,11 @@ void DMA1_Channel2_3_IRQHandler(void)
     }
 }
 
+uint8_t is_alive()
+{
+    return (HAL_GetTick() - keep_alive) <= KEEP_ALIVE_PERIOD;
+}
+
 void send_on_serial(uint8_t payload[], uint8_t payload_size)
 {
     send_buff[0] = 255;
