@@ -6,13 +6,16 @@
 #define SEND_BUFF_SIZE 64
 uint8_t send_buff[SEND_BUFF_SIZE] = {0};
 
-#define RECV_BUFF_SIZE 256
-#define RECV_RING_BUFFER_SIZE 15
+#define RECV_BUFF_SIZE 64
+#define RECV_RING_BUFFER_SIZE 30
 volatile uint8_t recv_buff[RECV_RING_BUFFER_SIZE][RECV_BUFF_SIZE] = {0};
 volatile uint8_t recv_buff_msg_size[RECV_RING_BUFFER_SIZE] = {0};
 static volatile uint8_t nb_recv_buff = 0;
 static volatile uint8_t recv_buff_read_index = 0;
 static volatile uint8_t recv_buff_write_index = 0;
+
+static uint8_t remaining_buff_read[RECV_BUFF_SIZE + RECV_BUFF_SIZE] = {0};
+static uint8_t remaining_buff_read_index = 0;
 
 #define KEEP_ALIVE_PERIOD 1100
 static uint32_t keep_alive = 0;
@@ -28,17 +31,21 @@ void Gate_Init(void)
     watchdog_Init();
     status_led(0);
 
-    LL_USART_ClearFlag_IDLE(USART3);
-    LL_USART_EnableIT_IDLE(USART3);
     NVIC_DisableIRQ(DMA1_Channel2_3_IRQn);
-    LL_DMA_DisableIT_TC(DMA1, LL_DMA_CHANNEL_3);
+    LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_3);
     LL_DMA_DisableIT_HT(DMA1, LL_DMA_CHANNEL_3);
     LL_DMA_DisableIT_TE(DMA1, LL_DMA_CHANNEL_3);
     LL_DMA_SetM2MDstAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
     LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_3, RECV_BUFF_SIZE);
     LL_DMA_SetM2MSrcAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)&USART3->RDR);
-    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
+    NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
+
+    LL_USART_ClearFlag_IDLE(USART3);
+    LL_USART_EnableIT_IDLE(USART3);
     LL_USART_EnableDMAReq_RX(USART3);
+
+    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
+    LL_USART_Enable(USART3);
 
     revision_t revision = {.unmap = REV};
     my_container = Luos_CreateContainer(Gate_MsgHandler, GATE_MOD, "gate", revision);
@@ -49,31 +56,46 @@ void Gate_Loop(void)
     watchdog_Refresh();
 
     if (nb_recv_buff > 0)
-    {
-        uint8_t bytes_read = recv_buff_msg_size[recv_buff_read_index];
-        uint8_t *msg = (uint8_t *)recv_buff[recv_buff_read_index];
+    {        
+        uint8_t *msg_buff = (uint8_t *)recv_buff[recv_buff_read_index];
+        uint8_t buff_length = recv_buff_msg_size[recv_buff_read_index];
 
-        while (bytes_read > 0)
+        uint8_t header_offset;
+        uint8_t payload_size;
+
+        if (remaining_buff_read_index > 0)
         {
-            uint8_t header_offset = 0;
+            memcpy(remaining_buff_read + remaining_buff_read_index, msg_buff, buff_length);
+            uint8_t msg_complete = get_next_message_length(remaining_buff_read, remaining_buff_read_index + buff_length, &header_offset, &payload_size);
+            ASSERT (msg_complete == 1);
+            handle_inbound_msg(remaining_buff_read + header_offset, payload_size);
 
-            ASSERT ((msg[header_offset] == 255));
-            header_offset++;
+            uint8_t msg_size = header_offset + payload_size;
+            uint8_t offset = msg_size - remaining_buff_read_index;
 
-            if (msg[header_offset] == 255)
+            msg_buff += offset;
+            buff_length -= offset;
+
+            remaining_buff_read_index = 0;
+        }
+
+        while (buff_length > 0)
+        {
+            uint8_t msg_complete = get_next_message_length(msg_buff, buff_length, &header_offset, &payload_size);
+            if (msg_complete == 1)
             {
-                header_offset++;
+                handle_inbound_msg(msg_buff + header_offset, payload_size);
+
+                uint8_t msg_size = header_offset + payload_size;
+                buff_length -= msg_size;
+                msg_buff += msg_size;
             }
-
-            uint8_t payload_size = msg[header_offset];
-            header_offset++;
-            uint8_t msg_size = payload_size + header_offset;
-            ASSERT (msg_size <= bytes_read);
-
-            handle_inbound_msg(msg + header_offset, payload_size);
-
-            bytes_read -= msg_size;
-            msg += msg_size;
+            else 
+            {
+                memcpy(remaining_buff_read, msg_buff, buff_length);
+                remaining_buff_read_index = buff_length;
+                break;
+            }
         }
 
         recv_buff_read_index++;
@@ -107,6 +129,36 @@ void Gate_MsgHandler(container_t *src, msg_t *msg)
     {
         send_on_serial(msg->data, msg->header.size);
     }
+}
+
+uint8_t get_next_message_length(uint8_t msg_buff[], uint8_t buff_length, uint8_t *header_offset_res, uint8_t *payload_size_res)
+{
+    if (buff_length < 3)
+    {
+        return 0;
+    }
+
+    uint8_t header_offset = 0;
+    ASSERT ((msg_buff[header_offset] == 255));
+    header_offset++;
+
+    if (msg_buff[header_offset] == 255)
+    {
+        header_offset++;
+    }
+    uint8_t payload_size = msg_buff[header_offset];
+    header_offset++;
+
+    uint8_t msg_size = payload_size + header_offset;
+
+    if (msg_size > buff_length)
+    {
+        return 0;
+    }
+    *header_offset_res = header_offset;
+    *payload_size_res = payload_size;
+
+    return 1;
 }
 
 void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
@@ -314,17 +366,15 @@ void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
     }
 }
 
-void USART3_4_IRQHandler(void)
+void usart_rx_check()
 {
-    // check if we receive an IDLE on usart3
-    if (LL_USART_IsActiveFlag_IDLE(USART3))
+    // reset DMA
+    __disable_irq();
+
+    uint8_t bytes_received = RECV_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
+    if (bytes_received > 0)
     {
-        LL_USART_ClearFlag_IDLE(USART3);
-
-        // reset DMA
-        __disable_irq();
-
-        recv_buff_msg_size[recv_buff_write_index] = RECV_BUFF_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
+        recv_buff_msg_size[recv_buff_write_index] = bytes_received;
 
         recv_buff_write_index++;
         if (recv_buff_write_index == RECV_RING_BUFFER_SIZE)
@@ -332,7 +382,7 @@ void USART3_4_IRQHandler(void)
             recv_buff_write_index = 0;
         }
         nb_recv_buff++;
-        ASSERT (nb_recv_buff < (RECV_RING_BUFFER_SIZE - 1));
+        ASSERT (nb_recv_buff < RECV_RING_BUFFER_SIZE);
 
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_3);
 
@@ -342,8 +392,27 @@ void USART3_4_IRQHandler(void)
         LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_3, (uint32_t)recv_buff[recv_buff_write_index]);
         LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
         LL_USART_EnableDMAReq_RX(USART3);
+    }
 
-        __enable_irq();
+    __enable_irq();
+}
+
+void USART3_4_IRQHandler(void)
+{
+    // check if we receive an IDLE on usart3
+    if (LL_USART_IsActiveFlag_IDLE(USART3))
+    {
+        LL_USART_ClearFlag_IDLE(USART3);
+        usart_rx_check();
+    }
+}
+
+void DMA1_Channel2_3_IRQHandler(void)
+{
+    if (LL_DMA_IsEnabledIT_TC(DMA1, LL_DMA_CHANNEL_3) && LL_DMA_IsActiveFlag_TC3(DMA1)) 
+    {
+        LL_DMA_ClearFlag_TC3(DMA1);             /* Clear transfer complete flag */
+        usart_rx_check();                       /* Check for data to process */
     }
 }
 
