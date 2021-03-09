@@ -83,11 +83,11 @@ void Fan_MsgHandler(container_t *src, msg_t *msg)
 
 uint8_t fan_id_from_dxl_id(uint8_t dxl_id)
 {
-    if (dxl_id == 10 || dxl_id == 20)
+    if (dxl_id == 10 || dxl_id == 20 || dxl_id == 30)
     {
         return SHOULDER_FAN_ID;
     }
-    else if (dxl_id == 13 || dxl_id == 23)
+    else if (dxl_id == 13 || dxl_id == 23 || dxl_id == 31)
     {
         return ELBOW_FAN_ID;
     }
