@@ -48,7 +48,7 @@ void Dxl_Loop(void)
     if ((current_tick - last_pos_published) >= pos_publish_period)
     {
         uint16_t position;
-        servo_error_t error = servo_get_raw_word(dxl_ids[motor_id], SERVO_REGISTER_PRESENT_ANGLE, &position, DXL_TIMEOUT);
+        servo_error_t error = servo_get_raw_word(dxl_ids[motor_id], SERVO_REGISTER_PRESENT_ANGLE, &position, DXL_FAST_TIMEOUT);
         send_dxl_word_to_gate(dxl_container[motor_id], dxl_ids[motor_id], SERVO_REGISTER_PRESENT_ANGLE, error, position);
         motor_id++;
         if (motor_id == nb_ids)
@@ -62,7 +62,7 @@ void Dxl_Loop(void)
     if ((current_tick - last_temperature_published) >= temp_publish_period)
     {
         uint8_t result;
-        servo_error_t error = servo_get_raw_byte(dxl_ids[temperature_id], SERVO_REGISTER_PRESENT_TEMPERATURE, &result, DXL_TIMEOUT);
+        servo_error_t error = servo_get_raw_byte(dxl_ids[temperature_id], SERVO_REGISTER_PRESENT_TEMPERATURE, &result, DXL_FAST_TIMEOUT);
         send_dxl_byte_to_gate(dxl_container[temperature_id], dxl_ids[temperature_id], SERVO_REGISTER_PRESENT_TEMPERATURE, error, result);
 
         if (error == SERVO_NO_ERROR)
@@ -108,19 +108,19 @@ void Dxl_MsgHandler(container_t *src, msg_t *msg)
             if (val_size == 1)
             {
                 uint8_t val;
-                servo_error_t error = servo_get_raw_byte(dxl_id, reg, &val, DXL_TIMEOUT);
+                servo_error_t error = servo_get_raw_byte(dxl_id, reg, &val, DXL_SURE_TIMEOUT);
                 send_dxl_byte_to_gate(dxl_container[container_id], dxl_id, reg, error, val);
             }
             else if (val_size == 2)
             {
                 uint16_t val;
-                servo_error_t error = servo_get_raw_word(dxl_id, reg, &val, DXL_TIMEOUT);
+                servo_error_t error = servo_get_raw_word(dxl_id, reg, &val, DXL_SURE_TIMEOUT);
                 send_dxl_word_to_gate(dxl_container[container_id], dxl_id, reg, error, val);
             }
             else 
             {
                 uint8_t values[val_size];
-                servo_error_t error = servo_get_raw_page(dxl_id, reg, values, val_size, DXL_TIMEOUT);
+                servo_error_t error = servo_get_raw_page(dxl_id, reg, values, val_size, DXL_SURE_TIMEOUT);
                 send_dxl_page_to_gate(dxl_container[container_id], dxl_id, reg, error, values, val_size);
             }
         }
@@ -214,7 +214,7 @@ void dxl_detect()
     for (int id=0; id < MAX_DXL_ID; id++)
     {
         LUOS_ASSERT (!is_alive());
-        if (servo_ping(id, DXL_TIMEOUT) == SERVO_NO_ERROR)
+        if (servo_ping(id, DXL_SURE_TIMEOUT) == SERVO_NO_ERROR)
         {
             sprintf(dxl_name, "dxl_%d", id);
             dxl_container[nb_ids] = Luos_CreateContainer(Dxl_MsgHandler, DYNAMIXEL_MOD, dxl_name, revision);
