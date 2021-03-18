@@ -16,6 +16,8 @@ typedef enum
 
     // LOAD sensor
     MSG_TYPE_LOAD_PUB_DATA = 20, // [MSG_TYPE_LOAD_PUB_DATA, (ID, FLOAT)+]
+    MSG_TYPE_LOAD_TARE = 21, // [MSG_TYPE_LOAD_TARE, ID]
+    MSG_TYPE_LOAD_SET_SCALE = 22, // [MSG_TYPE_LOAD_SET_SCALE, ID, FLOAT]
 
     // FAN
     // From PC -> Fan

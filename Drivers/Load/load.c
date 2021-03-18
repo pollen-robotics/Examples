@@ -46,6 +46,16 @@ void Load_MsgHandler(container_t *container, msg_t *msg)
     {
         keep_alive = HAL_GetTick();
     }
+    else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_LOAD_TARE))
+    {
+        hx711_tare(10);
+    }
+    else if ((msg->header.cmd == REGISTER) && (msg->data[0] == MSG_TYPE_LOAD_SET_SCALE))
+    {
+        float scale;
+        memcpy(&scale, msg->data + 2, sizeof(scale));
+        hx711_set_scale(scale);
+    }
 }
 
 void send_load_to_gate(container_t *src, float load)

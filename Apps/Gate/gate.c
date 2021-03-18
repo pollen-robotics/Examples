@@ -360,6 +360,26 @@ void handle_inbound_msg(uint8_t data[], uint8_t payload_size)
 
         Luos_SendMsg(my_container, &msg);
     }
+    else if ((msg_type == MSG_TYPE_LOAD_TARE) || (msg_type == MSG_TYPE_LOAD_SET_SCALE))
+    {
+        // [MSG_TYPE_LOAD_TARE, ID]
+        // [MSG_TYPE_LOAD_SET_SCALE, ID, FLOAT]
+
+        msg_t msg;
+        msg.header.target_mode = IDACK;
+        msg.header.cmd = REGISTER;
+        msg.header.size = payload_size;
+        memcpy(msg.data, data, payload_size);
+
+        char alias[15];
+        uint8_t force_sensor_id = data[1];
+        sprintf(alias, "load_%d", force_sensor_id);
+        uint16_t container_id = RoutingTB_IDFromAlias(alias);
+        ASSERT (container_id != 0xFFFF);
+        msg.header.target = container_id;
+
+        Luos_SendMsg(my_container, &msg);
+    }
     else
     {
         ASSERT (0);
